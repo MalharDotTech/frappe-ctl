@@ -9,6 +9,7 @@ import { cmdSubmit, cmdCancel } from "./commands/lifecycle.ts";
 import { cmdCall } from "./commands/call.ts";
 import { cmdReport } from "./commands/report.ts";
 import { cmdResources } from "./commands/resources.ts";
+import { cmdAgentContext } from "./commands/agent-context.ts";
 
 const VERSION = "0.1.0";
 
@@ -38,6 +39,7 @@ VERBS
   call       Call any whitelisted method     frappe-ctl next call frappe.client.get_list --data '{...}'
   report     Run a saved ERPNext Report      frappe-ctl next report "Project Billing Summary"
   resources  List all DocTypes for app       frappe-ctl next resources
+  agent-context  Machine-readable schema (for LLM tool registration)
 
 FLAGS
   --site <profile>              Override active profile
@@ -46,7 +48,12 @@ FLAGS
   --limit <n>                   Max results (default: 20)
   --data '{"field":"value"}'    JSON payload (create/patch)
   --force                       Skip confirmation (delete)
+  --dry-run                     Show what would happen, no writes
   -o, --output json|table|csv   Output format
+
+ENV
+  FRAPPE_CTL_READONLY=1         Block all mutations (safe for read-only agents)
+  FRAPPE_CTL_CONFIG_DIR         Override config directory
 
 EXAMPLES
   frappe-ctl next get Customer
@@ -77,10 +84,11 @@ interface ParsedArgs {
   flags: Record<string, string | true>;
   filters: string[];
   appVersions: string[];  // --app-version next=v16 (repeatable)
+  dryRun: boolean;
 }
 
 function parseArgs(argv: string[]): ParsedArgs {
-  const result: ParsedArgs = { positional: [], flags: {}, filters: [], appVersions: [] };
+  const result: ParsedArgs = { positional: [], flags: {}, filters: [], appVersions: [], dryRun: false };
   let i = 0;
 
   while (i < argv.length) {
@@ -90,6 +98,8 @@ function parseArgs(argv: string[]): ParsedArgs {
       result.site = argv[++i] ?? die("--site requires a value");
     } else if (arg === "--filter" || arg === "-f") {
       result.filters.push(argv[++i] ?? die("--filter requires a value"));
+    } else if (arg === "--dry-run") {
+      result.dryRun = true;
     } else if (arg === "--app-version") {
       result.appVersions.push(argv[++i] ?? die("--app-version requires a value"));
     } else if (arg === "--fields") {
@@ -135,6 +145,12 @@ async function main(): Promise<void> {
 
   if (argv[0] === "--version" || argv[0] === "-v") {
     console.log(VERSION);
+    return;
+  }
+
+  // agent-context — no app/site context needed
+  if (argv[0] === "agent-context") {
+    await cmdAgentContext();
     return;
   }
 
@@ -214,6 +230,19 @@ async function main(): Promise<void> {
     apiSecret: profile.api_secret,
   });
 
+  const MUTATION_VERBS = ["create", "patch", "delete", "submit", "cancel", "call"];
+  const readonly = process.env["FRAPPE_CTL_READONLY"] === "1";
+
+  if (readonly && MUTATION_VERBS.includes(args.verb!)) {
+    die(
+      `Mutation blocked: FRAPPE_CTL_READONLY=1 is set.\n` +
+      `Read-only verbs allowed: get, describe, report, resources.\n` +
+      `Unset FRAPPE_CTL_READONLY to allow writes.`,
+    );
+  }
+
+  const fmt = args.flags["output"] ? String(args.flags["output"]) : undefined;
+
   // Route verb
   switch (args.verb) {
     case "get": {
@@ -225,23 +254,13 @@ async function main(): Promise<void> {
         : undefined;
       const limit = args.flags["limit"] ? parseInt(String(args.flags["limit"]), 10) : 20;
 
-      await cmdGet(client, {
-        doctype,
-        name,
-        filters,
-        fields,
-        limit,
-        format: args.flags["output"] ? String(args.flags["output"]) : undefined,
-      });
+      await cmdGet(client, { doctype, name, filters, fields, limit, format: fmt });
       break;
     }
 
     case "describe": {
       const doctype = args.positional[0] ?? die(`DocType required. Example: frappe-ctl ${args.app} describe SalesOrder`);
-      await cmdDescribe(client, {
-        doctype,
-        format: args.flags["output"] ? String(args.flags["output"]) : undefined,
-      });
+      await cmdDescribe(client, { doctype, format: fmt });
       break;
     }
 
@@ -251,52 +270,39 @@ async function main(): Promise<void> {
       let data: Record<string, unknown>;
       try { data = JSON.parse(String(raw)) as Record<string, unknown>; }
       catch { die("--data must be valid JSON"); }
-      await cmdCreate(client, {
-        doctype,
-        data,
-        format: args.flags["output"] ? String(args.flags["output"]) : undefined,
-      });
+      await cmdCreate(client, { doctype, data, format: fmt, dryRun: args.dryRun });
       break;
     }
 
     case "patch": {
-      const doctype = args.positional[0] ?? die(`DocType required.`);
+      const doctype = args.positional[0] ?? die(`DocType required. Example: frappe-ctl ${args.app} patch SalesOrder SO-001 --data '{...}'`);
       const name = args.positional[1] ?? die(`Name required. Example: frappe-ctl ${args.app} patch SalesOrder SO-001 --data '{...}'`);
       const raw = args.flags["data"] ?? die("--data required. Example: --data '{\"status\":\"On Hold\"}'");
       let data: Record<string, unknown>;
       try { data = JSON.parse(String(raw)) as Record<string, unknown>; }
       catch { die("--data must be valid JSON"); }
-      await cmdPatch(client, {
-        doctype,
-        name,
-        data,
-        format: args.flags["output"] ? String(args.flags["output"]) : undefined,
-      });
+      await cmdPatch(client, { doctype, name, data, format: fmt, dryRun: args.dryRun });
       break;
     }
 
     case "delete": {
-      const doctype = args.positional[0] ?? die(`DocType required.`);
+      const doctype = args.positional[0] ?? die(`DocType required. Example: frappe-ctl ${args.app} delete SalesOrder SO-001 --force`);
       const name = args.positional[1] ?? die(`Name required. Example: frappe-ctl ${args.app} delete SalesOrder SO-001 --force`);
-      await cmdDelete(client, {
-        doctype,
-        name,
-        force: args.flags["force"] === true,
-      });
+      await cmdDelete(client, { doctype, name, force: args.flags["force"] === true, dryRun: args.dryRun });
       break;
     }
 
     case "submit": {
-      const doctype = args.positional[0] ?? die(`DocType required.`);
+      const doctype = args.positional[0] ?? die(`DocType required. Example: frappe-ctl ${args.app} submit SalesOrder SO-001`);
       const name = args.positional[1] ?? die(`Name required. Example: frappe-ctl ${args.app} submit SalesOrder SO-001`);
-      await cmdSubmit(client, { doctype, name });
+      await cmdSubmit(client, { doctype, name, dryRun: args.dryRun });
       break;
     }
 
     case "cancel": {
-      const doctype = args.positional[0] ?? die(`DocType required.`);
+      const doctype = args.positional[0] ?? die(`DocType required. Example: frappe-ctl ${args.app} cancel SalesOrder SO-001`);
       const name = args.positional[1] ?? die(`Name required. Example: frappe-ctl ${args.app} cancel SalesOrder SO-001`);
-      await cmdCancel(client, { doctype, name });
+      await cmdCancel(client, { doctype, name, dryRun: args.dryRun });
       break;
     }
 
@@ -308,40 +314,31 @@ async function main(): Promise<void> {
         try { data = JSON.parse(String(raw)) as Record<string, unknown>; }
         catch { die("--data must be valid JSON"); }
       }
-      await cmdCall(client, {
-        method,
-        data,
-        format: args.flags["output"] ? String(args.flags["output"]) : undefined,
-      });
+      await cmdCall(client, { method, data, format: fmt });
       break;
     }
 
     case "report": {
-      const reportName = args.positional[0] ?? die(`Report name required. Example: frappe-ctl ${args.app} report "Project Billing Summary"`);
+      const reportName = args.positional[0] ?? die(`Report name required. Example: frappe-ctl ${args.app} report "Accounts Receivable"`);
       const raw = args.flags["filter"] ?? args.flags["filters"];
       let filters: Record<string, unknown> = {};
       if (raw) {
         try { filters = JSON.parse(String(raw)) as Record<string, unknown>; }
         catch { die("--filter for report must be a JSON object: --filter '{\"company\":\"Acme\"}'"); }
       }
-      await cmdReport(client, {
-        reportName,
-        filters,
-        format: args.flags["output"] ? String(args.flags["output"]) : undefined,
-      });
+      await cmdReport(client, { reportName, filters, format: fmt });
       break;
     }
 
     case "resources": {
-      await cmdResources(client, {
-        appAlias: args.app!,
-        format: args.flags["output"] ? String(args.flags["output"]) : undefined,
-      });
+      await cmdResources(client, { appAlias: args.app!, format: fmt });
       break;
     }
 
-    default:
-      die(`Verb '${args.verb}' not yet implemented. Run: frappe-ctl --help`);
+    default: {
+      const known = ["get", "describe", "create", "patch", "delete", "submit", "cancel", "call", "report", "resources"];
+      die(`Unknown verb '${args.verb}'. Valid verbs: ${known.join(", ")}`);
+    }
   }
 }
 
