@@ -130,6 +130,45 @@ Target: every new verb gets its own `*.test.ts` with at minimum: happy path, fil
 
 ---
 
+## Agent-Native Design Principles (don't compromise these)
+
+Drawn from gogcli, Trevin's 10 principles, and openclaw integration requirements. These inform every new feature decision.
+
+### Locked in (already implemented)
+| Principle | How frappe-ctl does it |
+|-----------|----------------------|
+| Non-interactive by default | No prompts. `--force` for destructive ops. |
+| JSON stdout when piped | `process.stdout.isTTY` check on every command |
+| Errors to stderr, data to stdout | `die()` uses `console.error`, data uses `console.log` |
+| Exit codes | 0 = success, 1 = any error |
+| Named profiles | `profile add/use/list/remove` + `--site` override |
+| `FRAPPE_CTL_CONFIG_DIR` | Sandboxed config per agent session |
+| Bounded responses | Default `--limit 20` on `get` |
+
+### Must implement before calling ERPNext "done done"
+| Principle | What to build |
+|-----------|--------------|
+| **Errors enumerate valid options** | On bad filter op (`===`), list valid ops. On unknown DocType, suggest similar. On bad verb, list all verbs. Never just "invalid input". |
+| **`--dry-run` on mutations** | create/patch/delete/submit/cancel show intended action without writing. Print what would be sent. |
+| **`agent-context` command** | `frappe-ctl agent-context` outputs versioned JSON: all verbs, flags, types, examples. Consumable by LLM tool registration. |
+| **Frappe Cloud auth** | OAuth PKCE for `*.erpnext.com` and `*.frappe.cloud` — different from self-hosted token auth. |
+| **`FRAPPE_CTL_READONLY=1`** | Env var that hard-blocks all mutations. Safe default for read-only agent sessions. |
+
+### Phase 2 targets (agent hardening)
+| Principle | What to build |
+|-----------|--------------|
+| MCP adapter | `mcp/index.ts` stdio server — typed tools, read-only by default, mutations behind opt-in |
+| `--wait` on async jobs | Block until Frappe background job completes. ERPNext bulk ops are async. |
+| Command allowlisting | `--enable-verbs get,describe` — restrict surface for sandboxed agent invocations |
+
+### Don'ts (from gogcli + openclaw learnings)
+- **Never expose generic shell execution** in MCP — expose typed tools, not `bash(cmd)`
+- **Never auto-paginate silently** — truncate with a message, let the agent decide to fetch more
+- **Don't wrap free-text Frappe fields as structured data** — mark them as untrusted prose for LLM consumption
+- **Don't mix auth flows** — self-hosted uses `token key:secret`, Frappe Cloud will use OAuth. Keep these separate code paths, never conflate.
+
+---
+
 ## Known Frappe Quirks
 
 | Quirk | Detail |

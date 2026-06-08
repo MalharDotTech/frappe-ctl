@@ -187,9 +187,68 @@ src/
 
 ---
 
+## Agent Integration
+
+frappe-ctl is built to plug directly into agent frameworks — Claude Code, Cursor, Codex, openclaw, and any tool that can shell out.
+
+Key design choices that make it agent-friendly:
+- **JSON stdout by default** when not a TTY — pipe straight into `jq` or an LLM
+- **Errors enumerate valid options** — agent can self-correct in one retry, no help-text parsing
+- **`--force` required for destructive ops** — agents can't accidentally delete
+- **Named profiles** — agents reuse a profile without re-specifying credentials every call
+- **`FRAPPE_CTL_CONFIG_DIR`** env var — sandboxed config per agent session if needed
+
+### MCP (coming)
+An MCP adapter will wrap `client.ts` as a stdio MCP server, exposing typed tools (`get_doc`, `list_docs`, `create_doc`, etc.) consumable directly by Claude, Cursor, and any MCP-compatible host. Read-only by default; mutations require explicit opt-in.
+
+---
+
+## ERPNext Coverage (current)
+
+| Verb | ERPNext use case |
+|------|-----------------|
+| `get` | Fetch Sales Orders, Invoices, Customers, Projects |
+| `describe` | Inspect any DocType schema before writing |
+| `create` | New Customer, Supplier, Sales Order, Project |
+| `patch` | Update status, amounts, custom fields |
+| `delete` | Remove draft docs (--force required) |
+| `submit` | Submit Sales Order, Purchase Invoice, Payment Entry |
+| `cancel` | Cancel submitted docs |
+| `call` | Any whitelisted method — `frappe.client.get_count`, custom scripts |
+| `report` | Run Accounts Receivable, Project Billing Summary, etc. |
+| `resources` | Discover all DocTypes in an app's modules |
+
+### ERPNext "done done" checklist (before moving to other apps)
+
+- [ ] `workflow` verb — trigger ERPNext workflow actions (approve/reject)
+- [ ] `attach` verb — upload file to a doc (`/api/method/upload_file`)
+- [ ] `print` verb — fetch print format as PDF (`/api/method/frappe.utils.print_format.download_pdf`)
+- [ ] `bulk` flag — `get` + patch/delete across a filtered set in one command
+- [ ] `--dry-run` on create/patch/delete — show what would happen, no write
+- [ ] Frappe Cloud auth — OAuth PKCE flow + token storage for `*.erpnext.com` sites
+- [ ] `agent-context` command — machine-readable JSON schema of all verbs/flags for LLM tool registration
+
+---
+
 ## Roadmap
 
-- [ ] MCP adapter — wrap `client.ts` as a stdio MCP server for LLM tool use
-- [ ] `frappe-ctl next watch` — poll and stream doc changes
+### Phase 1 — ERPNext complete (before next app)
+- [ ] `workflow` verb — approve/reject ERPNext workflow states
+- [ ] `attach` / `print` verbs — file handling and PDF export
+- [ ] `--dry-run` flag on all mutations
+- [ ] Frappe Cloud auth (OAuth PKCE — `*.erpnext.com` and `*.frappe.cloud`)
+- [ ] Error enumeration — invalid filter ops, bad DocType names list valid alternatives
+- [ ] `agent-context` command — versioned JSON schema for LLM tool discovery
+
+### Phase 2 — Agent-native hardening
+- [ ] MCP adapter — `mcp/index.ts` stdio server wrapping `client.ts`, read-only by default
+- [ ] `--wait` flag on mutations — block until Frappe background job completes
+- [ ] `jobs` command — list/get/cancel Frappe background jobs (`frappe.model.delete_doc`)
+- [ ] Command allowlisting — `--enable-verbs get,describe` for sandboxed agent sessions
+- [ ] `FRAPPE_CTL_READONLY=1` env var — hard block on all mutations
+
+### Phase 3 — Distribution
 - [ ] Shell completions (bash/zsh/fish)
-- [ ] Compiled binary releases via GitHub Actions
+- [ ] Compiled binary releases via GitHub Actions (`bun build --compile`)
+- [ ] `frappe-ctl next watch` — poll and stream doc changes
+- [ ] Homebrew tap
