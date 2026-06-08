@@ -1,0 +1,21 @@
+{
+  "name": "frappe-ctl",
+  "version": "0.1.0",
+  "description": "kubectl-style CLI for the Frappe ecosystem",
+  "type": "module",
+  "bin": {
+    "frappe-ctl": "./src/cli.ts"
+  },
+  "scripts": {
+    "dev": "bun run src/cli.ts",
+    "build": "bun build --compile --minify src/cli.ts --outfile frappe-ctl",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test",
+    "test:watch": "bun test --watch",
+    "test:coverage": "bun test --coverage"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.0.0"
+  }
+}

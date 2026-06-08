@@ -1,0 +1,75 @@
+import { describe, it, expect, spyOn, afterEach } from "bun:test";
+import { FrappeClient } from "../client.ts";
+import { cmdCall } from "./call.ts";
+import { callMethodResponse } from "../__fixtures__/api-responses.ts";
+
+const client = new FrappeClient({ url: "http://test.localhost", apiKey: "k", apiSecret: "s" });
+
+function mockFetch(body: unknown, status = 200) {
+  return spyOn(globalThis, "fetch").mockResolvedValueOnce(
+    new Response(JSON.stringify(body), { status }),
+  );
+}
+
+describe("cmdCall", () => {
+  afterEach(() => spyOn(globalThis, "fetch").mockRestore());
+
+  it("POSTs to /api/method/{method}", async () => {
+    const spy = mockFetch(callMethodResponse);
+    spyOn(console, "log").mockImplementation(() => {});
+
+    await cmdCall(client, { method: "frappe.client.get_list", data: { doctype: "Sales Order" }, format: "json" });
+
+    const [url] = spy.mock.calls[0] as [string];
+    expect(url).toContain("/api/method/frappe.client.get_list");
+  });
+
+  it("passes data fields in request body", async () => {
+    const spy = mockFetch(callMethodResponse);
+    spyOn(console, "log").mockImplementation(() => {});
+
+    await cmdCall(client, {
+      method: "frappe.client.get_list",
+      data: { doctype: "Sales Order", limit_page_length: 5 },
+      format: "json",
+    });
+
+    const [, options] = spy.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse((options as RequestInit).body as string) as Record<string, unknown>;
+    expect(body["doctype"]).toBe("Sales Order");
+    expect(body["limit_page_length"]).toBe(5);
+  });
+
+  it("works without data (empty call)", async () => {
+    mockFetch({ message: "pong" });
+    const logs: string[] = [];
+    spyOn(console, "log").mockImplementation((m) => logs.push(String(m)));
+
+    await cmdCall(client, { method: "frappe.ping", format: "json" });
+
+    expect(logs[0]).toContain("pong");
+  });
+
+  it("outputs raw method response as JSON", async () => {
+    mockFetch(callMethodResponse);
+    const logs: string[] = [];
+    spyOn(console, "log").mockImplementation((m) => logs.push(String(m)));
+
+    await cmdCall(client, { method: "frappe.client.get_list", data: { doctype: "Sales Order" }, format: "json" });
+
+    const result = JSON.parse(logs[0]!) as unknown[];
+    expect(Array.isArray(result)).toBe(true);
+    expect((result[0] as Record<string, unknown>)["name"]).toBe("SO-2024-00001");
+  });
+
+  it("method name is passed exactly — dotted path must be preserved", async () => {
+    const spy = mockFetch({ message: "ok" });
+    spyOn(console, "log").mockImplementation(() => {});
+
+    const method = "erpnext.accounts.doctype.payment_entry.payment_entry.get_payment_entry";
+    await cmdCall(client, { method, format: "json" });
+
+    const [url] = spy.mock.calls[0] as [string];
+    expect(url).toContain(method);
+  });
+});

@@ -1,0 +1,4 @@
+[test]
+# Tests colocated with source: src/**/*.test.ts
+root = "src"
+timeout = 10000

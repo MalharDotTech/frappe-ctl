@@ -1,0 +1,352 @@
+#!/usr/bin/env bun
+import { FrappeClient } from "./client.ts";
+import { loadConfig, getActiveProfile, profileAdd, profileUse, profileList, profileRemove } from "./config.ts";
+import { resolveApp, APPS } from "./apps.ts";
+import { cmdGet, parseFilter } from "./commands/get.ts";
+import { cmdDescribe } from "./commands/describe.ts";
+import { cmdCreate, cmdPatch, cmdDelete } from "./commands/write.ts";
+import { cmdSubmit, cmdCancel } from "./commands/lifecycle.ts";
+import { cmdCall } from "./commands/call.ts";
+import { cmdReport } from "./commands/report.ts";
+import { cmdResources } from "./commands/resources.ts";
+
+const VERSION = "0.1.0";
+
+function die(msg: string): never {
+  console.error(`error: ${msg}`);
+  process.exit(1);
+}
+
+function usage(): void {
+  console.log(`frappe-ctl v${VERSION}
+
+USAGE
+  frappe-ctl [--site <profile>] <app> <verb> [DocType] [name] [flags]
+  frappe-ctl profile <add|use|list|remove> [args]
+
+APPS
+${Object.values(APPS).map((a) => `  ${a.alias.padEnd(10)} ${a.name}`).join("\n")}
+
+VERBS
+  get        List or fetch docs            frappe-ctl next get SalesOrder [name]
+  describe   DocType schema + fields       frappe-ctl next describe SalesOrder
+  create     Create a new doc              frappe-ctl next create SalesOrder --data '{...}'
+  patch      Update fields on a doc        frappe-ctl next patch SalesOrder SO-001 --data '{...}'
+  delete     Delete a doc (needs --force)  frappe-ctl next delete SalesOrder SO-001 --force
+  submit     Submit (docstatus 0→1)        frappe-ctl next submit SalesOrder SO-001
+  cancel     Cancel (docstatus 1→2)        frappe-ctl next cancel SalesOrder SO-001
+  call       Call any whitelisted method     frappe-ctl next call frappe.client.get_list --data '{...}'
+  report     Run a saved ERPNext Report      frappe-ctl next report "Project Billing Summary"
+  resources  List all DocTypes for app       frappe-ctl next resources
+
+FLAGS
+  --site <profile>              Override active profile
+  --filter "field=value"        Filter (repeatable, get only)
+  --fields name,status,...      Fields to return (default: all)
+  --limit <n>                   Max results (default: 20)
+  --data '{"field":"value"}'    JSON payload (create/patch)
+  --force                       Skip confirmation (delete)
+  -o, --output json|table|csv   Output format
+
+EXAMPLES
+  frappe-ctl next get Customer
+  frappe-ctl next get SalesOrder SO-2024-0001
+  frappe-ctl next get SalesOrder --filter "status=Open" --limit 50
+  frappe-ctl next describe SalesOrder
+  frappe-ctl next create Customer --data '{"customer_name":"Acme","customer_type":"Company"}'
+  frappe-ctl next patch SalesOrder SO-001 --data '{"status":"On Hold"}'
+  frappe-ctl next delete SalesOrder SO-001 --force
+  frappe-ctl next submit SalesOrder SO-001
+  frappe-ctl next cancel SalesOrder SO-001
+
+PROFILE MANAGEMENT
+  frappe-ctl profile add uat --url http://localhost:8080 --key abc --secret xyz
+  frappe-ctl profile use prod
+  frappe-ctl profile list
+  frappe-ctl profile remove uat
+`);
+}
+
+// ── arg parser (no external deps) ────────────────────────────────────────────
+
+interface ParsedArgs {
+  site?: string;
+  app?: string;
+  verb?: string;
+  positional: string[];
+  flags: Record<string, string | true>;
+  filters: string[];
+  appVersions: string[];  // --app-version next=v16 (repeatable)
+}
+
+function parseArgs(argv: string[]): ParsedArgs {
+  const result: ParsedArgs = { positional: [], flags: {}, filters: [], appVersions: [] };
+  let i = 0;
+
+  while (i < argv.length) {
+    const arg = argv[i]!;
+
+    if (arg === "--site" || arg === "-s") {
+      result.site = argv[++i] ?? die("--site requires a value");
+    } else if (arg === "--filter" || arg === "-f") {
+      result.filters.push(argv[++i] ?? die("--filter requires a value"));
+    } else if (arg === "--app-version") {
+      result.appVersions.push(argv[++i] ?? die("--app-version requires a value"));
+    } else if (arg === "--fields") {
+      result.flags["fields"] = argv[++i] ?? die("--fields requires a value");
+    } else if (arg === "--limit" || arg === "-l") {
+      result.flags["limit"] = argv[++i] ?? die("--limit requires a value");
+    } else if (arg === "--output" || arg === "-o") {
+      result.flags["output"] = argv[++i] ?? die("--output requires a value");
+    } else if (arg.startsWith("--")) {
+      const key = arg.slice(2);
+      const next = argv[i + 1];
+      if (next && !next.startsWith("-")) {
+        result.flags[key] = next;
+        i++;
+      } else {
+        result.flags[key] = true;
+      }
+    } else {
+      result.positional.push(arg);
+    }
+    i++;
+  }
+
+  // positional[0] = app, positional[1] = verb, positional[2+] = doctype/name
+  [result.app, result.verb, ...result.positional] = result.positional as [
+    string | undefined,
+    string | undefined,
+    ...string[],
+  ];
+
+  return result;
+}
+
+// ── main ─────────────────────────────────────────────────────────────────────
+
+async function main(): Promise<void> {
+  const argv = process.argv.slice(2);
+
+  if (!argv.length || argv[0] === "--help" || argv[0] === "-h") {
+    usage();
+    return;
+  }
+
+  if (argv[0] === "--version" || argv[0] === "-v") {
+    console.log(VERSION);
+    return;
+  }
+
+  // profile sub-command — no app/site context needed
+  if (argv[0] === "profile") {
+    const sub = argv[1];
+    switch (sub) {
+      case "add": {
+        const name = argv[2] ?? die("profile add requires a name");
+        const parsed = parseArgs(argv.slice(3));
+        const url = String(parsed.flags["url"] ?? die("--url required"));
+        const key = String(parsed.flags["key"] ?? die("--key required"));
+        const secret = String(parsed.flags["secret"] ?? die("--secret required"));
+        // --app-version next=v16 (repeatable) → { next: "v16" }
+        let appVersions: Record<string, string> | undefined;
+        if (parsed.appVersions.length) {
+          appVersions = {};
+          for (const entry of parsed.appVersions) {
+            const eqIdx = entry.indexOf("=");
+            const alias = eqIdx > 0 ? entry.slice(0, eqIdx) : "";
+            const version = eqIdx > 0 ? entry.slice(eqIdx + 1) : "";
+            if (!alias || !version) die(`--app-version must be app=vX format, got '${entry}'`);
+            if (!/^v\d+$/.test(version)) die(`version must be vX format (e.g. v16), got '${version}'`);
+            appVersions[alias] = version;
+          }
+        }
+        profileAdd(name, url, key, secret, appVersions);
+        break;
+      }
+      case "use":
+        profileUse(argv[2] ?? die("profile use requires a name"));
+        break;
+      case "list":
+      case "ls":
+        profileList();
+        break;
+      case "remove":
+      case "rm":
+        profileRemove(argv[2] ?? die("profile remove requires a name"));
+        break;
+      default:
+        die(`Unknown profile command '${sub}'. Use: add, use, list, remove`);
+    }
+    return;
+  }
+
+  const args = parseArgs(argv);
+
+  if (!args.app) {
+    usage();
+    return;
+  }
+
+  // Validate app
+  try {
+    resolveApp(args.app);
+  } catch (e) {
+    die((e as Error).message);
+  }
+
+  if (!args.verb) {
+    die(`Verb required. Example: frappe-ctl ${args.app} get <DocType>`);
+  }
+
+  // Build client from active profile
+  const cfg = loadConfig();
+  let profile;
+  try {
+    profile = getActiveProfile(cfg, args.site);
+  } catch (e) {
+    die((e as Error).message);
+  }
+
+  const client = new FrappeClient({
+    url: profile.url,
+    apiKey: profile.api_key,
+    apiSecret: profile.api_secret,
+  });
+
+  // Route verb
+  switch (args.verb) {
+    case "get": {
+      const doctype = args.positional[0] ?? die(`DocType required. Example: frappe-ctl ${args.app} get SalesOrder`);
+      const name = args.positional[1];
+      const filters = args.filters.map(parseFilter);
+      const fields = args.flags["fields"]
+        ? String(args.flags["fields"]).split(",").map((f) => f.trim())
+        : undefined;
+      const limit = args.flags["limit"] ? parseInt(String(args.flags["limit"]), 10) : 20;
+
+      await cmdGet(client, {
+        doctype,
+        name,
+        filters,
+        fields,
+        limit,
+        format: args.flags["output"] ? String(args.flags["output"]) : undefined,
+      });
+      break;
+    }
+
+    case "describe": {
+      const doctype = args.positional[0] ?? die(`DocType required. Example: frappe-ctl ${args.app} describe SalesOrder`);
+      await cmdDescribe(client, {
+        doctype,
+        format: args.flags["output"] ? String(args.flags["output"]) : undefined,
+      });
+      break;
+    }
+
+    case "create": {
+      const doctype = args.positional[0] ?? die(`DocType required. Example: frappe-ctl ${args.app} create Customer --data '{...}'`);
+      const raw = args.flags["data"] ?? die("--data required. Example: --data '{\"customer_name\":\"Acme\"}'");
+      let data: Record<string, unknown>;
+      try { data = JSON.parse(String(raw)) as Record<string, unknown>; }
+      catch { die("--data must be valid JSON"); }
+      await cmdCreate(client, {
+        doctype,
+        data,
+        format: args.flags["output"] ? String(args.flags["output"]) : undefined,
+      });
+      break;
+    }
+
+    case "patch": {
+      const doctype = args.positional[0] ?? die(`DocType required.`);
+      const name = args.positional[1] ?? die(`Name required. Example: frappe-ctl ${args.app} patch SalesOrder SO-001 --data '{...}'`);
+      const raw = args.flags["data"] ?? die("--data required. Example: --data '{\"status\":\"On Hold\"}'");
+      let data: Record<string, unknown>;
+      try { data = JSON.parse(String(raw)) as Record<string, unknown>; }
+      catch { die("--data must be valid JSON"); }
+      await cmdPatch(client, {
+        doctype,
+        name,
+        data,
+        format: args.flags["output"] ? String(args.flags["output"]) : undefined,
+      });
+      break;
+    }
+
+    case "delete": {
+      const doctype = args.positional[0] ?? die(`DocType required.`);
+      const name = args.positional[1] ?? die(`Name required. Example: frappe-ctl ${args.app} delete SalesOrder SO-001 --force`);
+      await cmdDelete(client, {
+        doctype,
+        name,
+        force: args.flags["force"] === true,
+      });
+      break;
+    }
+
+    case "submit": {
+      const doctype = args.positional[0] ?? die(`DocType required.`);
+      const name = args.positional[1] ?? die(`Name required. Example: frappe-ctl ${args.app} submit SalesOrder SO-001`);
+      await cmdSubmit(client, { doctype, name });
+      break;
+    }
+
+    case "cancel": {
+      const doctype = args.positional[0] ?? die(`DocType required.`);
+      const name = args.positional[1] ?? die(`Name required. Example: frappe-ctl ${args.app} cancel SalesOrder SO-001`);
+      await cmdCancel(client, { doctype, name });
+      break;
+    }
+
+    case "call": {
+      const method = args.positional[0] ?? die(`Method required. Example: frappe-ctl ${args.app} call frappe.client.get_list --data '{"doctype":"Customer"}'`);
+      const raw = args.flags["data"];
+      let data: Record<string, unknown> | undefined;
+      if (raw) {
+        try { data = JSON.parse(String(raw)) as Record<string, unknown>; }
+        catch { die("--data must be valid JSON"); }
+      }
+      await cmdCall(client, {
+        method,
+        data,
+        format: args.flags["output"] ? String(args.flags["output"]) : undefined,
+      });
+      break;
+    }
+
+    case "report": {
+      const reportName = args.positional[0] ?? die(`Report name required. Example: frappe-ctl ${args.app} report "Project Billing Summary"`);
+      const raw = args.flags["filter"] ?? args.flags["filters"];
+      let filters: Record<string, unknown> = {};
+      if (raw) {
+        try { filters = JSON.parse(String(raw)) as Record<string, unknown>; }
+        catch { die("--filter for report must be a JSON object: --filter '{\"company\":\"Acme\"}'"); }
+      }
+      await cmdReport(client, {
+        reportName,
+        filters,
+        format: args.flags["output"] ? String(args.flags["output"]) : undefined,
+      });
+      break;
+    }
+
+    case "resources": {
+      await cmdResources(client, {
+        appAlias: args.app!,
+        format: args.flags["output"] ? String(args.flags["output"]) : undefined,
+      });
+      break;
+    }
+
+    default:
+      die(`Verb '${args.verb}' not yet implemented. Run: frappe-ctl --help`);
+  }
+}
+
+main().catch((err: unknown) => {
+  const msg = err instanceof Error ? err.message : String(err);
+  console.error(`error: ${msg}`);
+  process.exit(1);
+});
