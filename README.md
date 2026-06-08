@@ -168,7 +168,7 @@ frappe-ctl profile add uat --url http://localhost:8080 --key k --secret s \
 bun test
 ```
 
-90 tests, colocated with source (`*.test.ts`). Pattern: BDD spec (`frappe-ctl.md`) → TDD (`*.test.ts`) → implementation. HTTP layer mocked via `spyOn(globalThis, "fetch")` — no live server needed.
+101 tests, colocated with source (`*.test.ts`). Pattern: BDD spec (`frappe-ctl.md`) → TDD (`*.test.ts`) → implementation. HTTP layer mocked via `spyOn(globalThis, "fetch")` — no live server needed.
 
 ---
 
@@ -224,28 +224,30 @@ An MCP adapter will wrap `client.ts` as a stdio MCP server, exposing typed tools
 - [ ] `attach` verb — upload file to a doc (`/api/method/upload_file`)
 - [ ] `print` verb — fetch print format as PDF (`/api/method/frappe.utils.print_format.download_pdf`)
 - [ ] `bulk` flag — `get` + patch/delete across a filtered set in one command
-- [ ] `--dry-run` on create/patch/delete — show what would happen, no write
+- [x] `--dry-run` on all mutations — show payload without writing
 - [ ] Frappe Cloud auth — OAuth PKCE flow + token storage for `*.erpnext.com` sites
-- [ ] `agent-context` command — machine-readable JSON schema of all verbs/flags for LLM tool registration
+- [x] `agent-context` command — machine-readable JSON schema for LLM tool registration
 
 ---
 
 ## Roadmap
 
 ### Phase 1 — ERPNext complete (before next app)
+- [x] Core verbs: `get`, `describe`, `create`, `patch`, `delete`, `submit`, `cancel`, `call`, `report`, `resources`
+- [x] `--dry-run` on all mutations
+- [x] `FRAPPE_CTL_READONLY=1` env var — hard-block all mutations for read-only agent sessions
+- [x] `agent-context` command — versioned JSON schema for LLM tool discovery
+- [x] Error enumeration — unknown verb lists all valid verbs
 - [ ] `workflow` verb — approve/reject ERPNext workflow states
-- [ ] `attach` / `print` verbs — file handling and PDF export
-- [ ] `--dry-run` flag on all mutations
-- [ ] Frappe Cloud auth (OAuth PKCE — `*.erpnext.com` and `*.frappe.cloud`)
-- [ ] Error enumeration — invalid filter ops, bad DocType names list valid alternatives
-- [ ] `agent-context` command — versioned JSON schema for LLM tool discovery
+- [ ] `attach` / `print` verbs — file upload and PDF export
+- [ ] Frappe Cloud auth — OAuth PKCE for `*.erpnext.com` and `*.frappe.cloud`
+- [ ] `bulk` flag — filter-scoped patch/delete in one command
 
 ### Phase 2 — Agent-native hardening
 - [ ] MCP adapter — `mcp/index.ts` stdio server wrapping `client.ts`, read-only by default
-- [ ] `--wait` flag on mutations — block until Frappe background job completes
-- [ ] `jobs` command — list/get/cancel Frappe background jobs (`frappe.model.delete_doc`)
-- [ ] Command allowlisting — `--enable-verbs get,describe` for sandboxed agent sessions
-- [ ] `FRAPPE_CTL_READONLY=1` env var — hard block on all mutations
+- [ ] `--wait` flag — block until Frappe background job completes
+- [ ] `jobs` command — list/get/cancel Frappe background jobs
+- [ ] Command allowlisting — `--enable-verbs get,describe` for sandboxed agent invocations
 
 ### Phase 3 — Distribution
 - [ ] Shell completions (bash/zsh/fish)
