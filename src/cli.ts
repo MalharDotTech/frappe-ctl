@@ -158,6 +158,12 @@ function parseArgs(argv: string[]): ParsedArgs {
     ...string[],
   ];
 
+  // Normalize PascalCase DocType → "Title Case" (SalesOrder → Sales Order)
+  // Frappe's DocType names use spaces; CLI accepts both forms for ergonomics
+  if (result.positional[0]) {
+    result.positional[0] = result.positional[0].replace(/([a-z])([A-Z])/g, "$1 $2");
+  }
+
   return result;
 }
 
