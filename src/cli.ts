@@ -12,6 +12,9 @@ import { cmdResources } from "./commands/resources.ts";
 import { cmdAgentContext } from "./commands/agent-context.ts";
 import { cmdApply } from "./commands/apply.ts";
 import { cmdLogs } from "./commands/logs.ts";
+import { cmdWorkflow } from "./commands/workflow.ts";
+import { cmdAttach } from "./commands/attach.ts";
+import { cmdPrint } from "./commands/print.ts";
 
 const VERSION = "0.1.0";
 
@@ -43,6 +46,9 @@ VERBS
   report     Run a saved ERPNext Report    frappe-ctl next report "Project Billing Summary"
   resources  List all DocTypes for app     frappe-ctl next resources
   logs       Tail Frappe error log         frappe-ctl next logs [--limit 20] [--method submit]
+  workflow   Apply workflow action         frappe-ctl next workflow SalesOrder SO-001 --action "Approve"
+  attach     Upload file to a doc         frappe-ctl next attach SalesInvoice SINV-001 --file invoice.pdf
+  print      Download PDF (print format)  frappe-ctl next print SalesInvoice SINV-001 --output invoice.pdf
   agent-context  Machine-readable schema (for LLM tool registration)
 
 FLAGS
@@ -236,7 +242,7 @@ async function main(): Promise<void> {
     apiSecret: profile.api_secret,
   });
 
-  const MUTATION_VERBS = ["create", "patch", "delete", "submit", "cancel", "call"];
+  const MUTATION_VERBS = ["create", "patch", "delete", "submit", "cancel", "call", "apply", "workflow", "attach"];
   const readonly = process.env["FRAPPE_CTL_READONLY"] === "1";
 
   if (readonly && MUTATION_VERBS.includes(args.verb!)) {
@@ -354,8 +360,35 @@ async function main(): Promise<void> {
       break;
     }
 
+    case "workflow": {
+      const doctype = args.positional[0] ?? die(`DocType required. Example: frappe-ctl ${args.app} workflow SalesOrder SO-001 --action "Approve"`);
+      const name = args.positional[1] ?? die(`Name required. Example: frappe-ctl ${args.app} workflow SalesOrder SO-001 --action "Approve"`);
+      const action = String(args.flags["action"] ?? die(`--action required. Example: --action "Approve"`));
+      await cmdWorkflow(client, { doctype, name, action, dryRun: args.dryRun });
+      break;
+    }
+
+    case "attach": {
+      const doctype = args.positional[0] ?? die(`DocType required. Example: frappe-ctl ${args.app} attach SalesInvoice SINV-001 --file invoice.pdf`);
+      const name = args.positional[1] ?? die(`Name required.`);
+      const file = String(args.flags["file"] ?? die(`--file required.`));
+      const isPrivate = args.flags["private"] === true;
+      await cmdAttach(client, { doctype, name, file, isPrivate, dryRun: args.dryRun });
+      break;
+    }
+
+    case "print": {
+      const doctype = args.positional[0] ?? die(`DocType required. Example: frappe-ctl ${args.app} print SalesInvoice SINV-001`);
+      const name = args.positional[1] ?? die(`Name required.`);
+      const printFormat = args.flags["format"] ? String(args.flags["format"]) : undefined;
+      const outFile = args.flags["output"] ? String(args.flags["output"]) : undefined;
+      const noLetterhead = args.flags["no-letterhead"] === true;
+      await cmdPrint(client, { doctype, name, printFormat, outFile, noLetterhead, dryRun: args.dryRun });
+      break;
+    }
+
     default: {
-      const known = ["get", "describe", "apply", "create", "patch", "delete", "submit", "cancel", "call", "report", "resources", "logs"];
+      const known = ["get", "describe", "apply", "create", "patch", "delete", "submit", "cancel", "call", "report", "resources", "logs", "workflow", "attach", "print"];
       die(`Unknown verb '${args.verb}'. Valid verbs: ${known.join(", ")}`);
     }
   }

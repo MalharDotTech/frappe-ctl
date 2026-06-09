@@ -208,6 +208,66 @@ export class FrappeClient {
     });
   }
 
+  async uploadFile(
+    doctype: string,
+    docname: string,
+    filename: string,
+    fileBuffer: Buffer,
+    isPrivate = 0,
+  ): Promise<Record<string, unknown>> {
+    const url = `${this.baseUrl}/api/method/upload_file`;
+    const form = new FormData();
+    form.append("doctype", doctype);
+    form.append("docname", docname);
+    form.append("is_private", String(isPrivate));
+    form.append("file", new Blob([fileBuffer]), filename);
+
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        method: "POST",
+        headers: { Authorization: this.authHeader },
+        body: form,
+      });
+    } catch (err) {
+      throw new FrappeRequestError(0, `Network error: ${(err as Error).message}`);
+    }
+
+    const text = await res.text();
+    if (!res.ok) {
+      throw new FrappeRequestError(res.status, `HTTP ${res.status} ${res.statusText}`, text.slice(0, 200));
+    }
+    const parsed = JSON.parse(text) as { message: Record<string, unknown> };
+    return parsed.message;
+  }
+
+  async downloadPdf(
+    doctype: string,
+    name: string,
+    printFormat?: string,
+    noLetterhead = 0,
+  ): Promise<Uint8Array> {
+    const params = new URLSearchParams({
+      doctype,
+      name,
+      no_letterhead: String(noLetterhead),
+    });
+    if (printFormat) params.set("format", printFormat);
+
+    const url = `${this.baseUrl}/api/method/frappe.utils.print_format.download_pdf?${params.toString()}`;
+    let res: Response;
+    try {
+      res = await fetch(url, { headers: { Authorization: this.authHeader } });
+    } catch (err) {
+      throw new FrappeRequestError(0, `Network error: ${(err as Error).message}`);
+    }
+    if (!res.ok) {
+      const text = await res.text();
+      throw new FrappeRequestError(res.status, `HTTP ${res.status} ${res.statusText}`, text.slice(0, 200));
+    }
+    return new Uint8Array(await res.arrayBuffer());
+  }
+
   async listDocTypes(modules?: string[]): Promise<Record<string, unknown>[]> {
     // Use POST method (frappe.client.get_list) instead of GET /api/resource
     // to avoid URL length limits when filtering by many modules
