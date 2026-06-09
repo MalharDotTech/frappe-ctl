@@ -486,6 +486,10 @@ async function main(): Promise<void> {
       die(`Unknown verb '${args.verb}'. Valid verbs: ${known.join(", ")}`);
     }
   }
+
+  // Bun 1.3.x doesn't drain stdout before exit when piped — empty write with callback
+  // blocks until the underlying stream flushes (fixes 64KB pipe truncation on large JSON)
+  await new Promise<void>((resolve) => process.stdout.write("", resolve));
 }
 
 main().catch((err: unknown) => {
