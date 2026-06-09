@@ -208,6 +208,20 @@ export class FrappeClient {
     });
   }
 
+  // Paginate listDocs until exhausted — returns ALL matching docs (names only by default)
+  async listAll(doctype: string, filters: FrappeFilter[] = [], fields = ["name"]): Promise<Record<string, unknown>[]> {
+    const PAGE = 100;
+    const all: Record<string, unknown>[] = [];
+    let start = 0;
+    while (true) {
+      const page = await this.listDocs(doctype, { filters, fields, limit: PAGE, limitStart: start });
+      all.push(...page);
+      if (page.length < PAGE) break;
+      start += PAGE;
+    }
+    return all;
+  }
+
   async uploadFile(
     doctype: string,
     docname: string,

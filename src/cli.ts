@@ -13,6 +13,7 @@ import { cmdAgentContext } from "./commands/agent-context.ts";
 import { cmdApply } from "./commands/apply.ts";
 import { cmdLogs } from "./commands/logs.ts";
 import { cmdWorkflow } from "./commands/workflow.ts";
+import { cmdBulk } from "./commands/bulk.ts";
 import { cmdAttach } from "./commands/attach.ts";
 import { cmdPrint } from "./commands/print.ts";
 
@@ -46,6 +47,7 @@ VERBS
   report     Run a saved ERPNext Report    frappe-ctl next report "Project Billing Summary"
   resources  List all DocTypes for app     frappe-ctl next resources
   logs       Tail Frappe error log         frappe-ctl next logs [--limit 20] [--method submit]
+  bulk       Patch or delete many docs     frappe-ctl next bulk patch SalesOrder --filter "status=Draft" --data '{...}'
   workflow   Apply workflow action         frappe-ctl next workflow SalesOrder SO-001 --action "Approve"
   attach     Upload file to a doc         frappe-ctl next attach SalesInvoice SINV-001 --file invoice.pdf
   print      Download PDF (print format)  frappe-ctl next print SalesInvoice SINV-001 --output invoice.pdf
@@ -242,7 +244,7 @@ async function main(): Promise<void> {
     apiSecret: profile.api_secret,
   });
 
-  const MUTATION_VERBS = ["create", "patch", "delete", "submit", "cancel", "call", "apply", "workflow", "attach"];
+  const MUTATION_VERBS = ["create", "patch", "delete", "submit", "cancel", "call", "apply", "workflow", "attach", "bulk"];
   const readonly = process.env["FRAPPE_CTL_READONLY"] === "1";
 
   if (readonly && MUTATION_VERBS.includes(args.verb!)) {
@@ -360,6 +362,28 @@ async function main(): Promise<void> {
       break;
     }
 
+    case "bulk": {
+      const subVerb = (args.positional[0] ?? die(`Sub-verb required: patch or delete.\nExample: frappe-ctl ${args.app} bulk patch SalesOrder --filter "status=Draft" --data '{...}'`)) as "patch" | "delete";
+      const doctype = args.positional[1] ?? die(`DocType required. Example: frappe-ctl ${args.app} bulk patch SalesOrder --filter "status=Draft"`);
+      if (!args.filters.length) die(`--filter required for bulk. Example: --filter "status=Draft"`);
+      const filters = args.filters.map(parseFilter);
+      const raw = args.flags["data"];
+      let data: Record<string, unknown> = {};
+      if (raw) {
+        try { data = JSON.parse(String(raw)) as Record<string, unknown>; }
+        catch { die("--data must be valid JSON"); }
+      }
+      await cmdBulk(client, {
+        subVerb,
+        doctype,
+        filters,
+        data,
+        force: args.flags["force"] === true,
+        dryRun: args.dryRun,
+      });
+      break;
+    }
+
     case "workflow": {
       const doctype = args.positional[0] ?? die(`DocType required. Example: frappe-ctl ${args.app} workflow SalesOrder SO-001 --action "Approve"`);
       const name = args.positional[1] ?? die(`Name required. Example: frappe-ctl ${args.app} workflow SalesOrder SO-001 --action "Approve"`);
@@ -388,7 +412,7 @@ async function main(): Promise<void> {
     }
 
     default: {
-      const known = ["get", "describe", "apply", "create", "patch", "delete", "submit", "cancel", "call", "report", "resources", "logs", "workflow", "attach", "print"];
+      const known = ["get", "describe", "apply", "create", "patch", "delete", "bulk", "submit", "cancel", "call", "report", "resources", "logs", "workflow", "attach", "print"];
       die(`Unknown verb '${args.verb}'. Valid verbs: ${known.join(", ")}`);
     }
   }
