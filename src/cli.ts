@@ -71,7 +71,8 @@ FLAGS
 
 ENV
   FRAPPE_CTL_READONLY=1         Block all mutations (safe for read-only agents)
-  FRAPPE_CTL_CONFIG_DIR         Override config directory
+  FRAPPE_CTL_CONFIG_DIR         Override config directory (default: ~/.config/frappe-ctl)
+  FRAPPE_CTL_NO_KEYCHAIN=1      Skip OS keychain, use file-only token storage (CI / sandboxed envs)
 
 EXAMPLES
   frappe-ctl next get Customer
