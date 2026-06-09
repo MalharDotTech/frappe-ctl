@@ -74,7 +74,8 @@ export class FrappeClient {
       throw new FrappeRequestError(0, `Network error: ${(err as Error).message}`);
     }
 
-    const text = await res.text();
+    // Bun 1.3.x res.text() truncates at 64KB — arrayBuffer() accumulates all chunks
+    const text = new TextDecoder().decode(await res.arrayBuffer());
 
     if (!res.ok) {
       let serverMessage: string | undefined;
@@ -201,17 +202,11 @@ export class FrappeClient {
     return this.callMethod<Record<string, unknown>>("frappe.client.cancel", { doc });
   }
 
-  // Fetches DocField rows instead of the full DocType document.
-  // Full DocType for wide doctypes (Sales Order ~200 fields) exceeds Frappe Cloud's 64KB
-  // Nginx response limit, causing truncated JSON. DocField query returns ~8KB for same schema.
   async getDocTypeMeta(doctype: string): Promise<Record<string, unknown>> {
-    const fields = await this.listDocs("DocField", {
-      filters: [["parent", "=", doctype]],
-      fields: ["fieldname", "fieldtype", "label", "reqd", "options", "description", "default"],
-      limit: 500,
-      orderBy: "idx asc",
+    return this.callMethod<Record<string, unknown>>("frappe.client.get", {
+      doctype: "DocType",
+      name: doctype,
     });
-    return { name: doctype, fields };
   }
 
   async runReport(
@@ -264,7 +259,8 @@ export class FrappeClient {
       throw new FrappeRequestError(0, `Network error: ${(err as Error).message}`);
     }
 
-    const text = await res.text();
+    // Bun 1.3.x res.text() truncates at 64KB — arrayBuffer() accumulates all chunks
+    const text = new TextDecoder().decode(await res.arrayBuffer());
     if (!res.ok) {
       throw new FrappeRequestError(res.status, `HTTP ${res.status} ${res.statusText}`, text.slice(0, 200));
     }
@@ -293,7 +289,8 @@ export class FrappeClient {
       throw new FrappeRequestError(0, `Network error: ${(err as Error).message}`);
     }
     if (!res.ok) {
-      const text = await res.text();
+      // Bun 1.3.x res.text() truncates at 64KB — arrayBuffer() accumulates all chunks
+    const text = new TextDecoder().decode(await res.arrayBuffer());
       throw new FrappeRequestError(res.status, `HTTP ${res.status} ${res.statusText}`, text.slice(0, 200));
     }
     return new Uint8Array(await res.arrayBuffer());
