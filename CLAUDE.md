@@ -2,6 +2,10 @@
 
 Read this before touching anything. These are the established conventions — don't drift from them.
 
+**Version:** see `package.json → version` (single source of truth). Update there only — README, ADRs, and agent-context derive from it.
+
+**Before making any non-trivial design choice:** check `docs/adr/` first. If a decision is already recorded, don't relitigate it. If you're making a new significant choice, create an ADR before or alongside the code change.
+
 ---
 
 ## What This Is
@@ -124,6 +128,39 @@ Target: every new verb gets its own `*.test.ts` with at minimum: happy path, fil
 3. Add fixture shapes to `src/__fixtures__/api-responses.ts`
 4. Wire into `cli.ts` verb router (`switch (args.verb)`)
 5. Add to `usage()` string in `cli.ts`
+6. If the verb introduces a non-obvious design choice → create `docs/adr/YYYYMMDD-NNN-title.md`
+
+## Adding an ADR
+
+When to write one: non-trivial design choice, Frappe quirk with surprising behaviour, rejected alternative worth recording, security constraint.
+
+File: `docs/adr/YYYYMMDD-NNN-kebab-title.md`
+- `YYYYMMDD` = date of decision (today's date)
+- `NNN` = next sequential number (check existing files)
+- Filename is the primary search surface — make it descriptive
+
+Required frontmatter (grepp-able fields):
+```yaml
+---
+adr: "NNN"
+title: ""
+date: YYYY-MM-DD
+status: accepted          # proposed | accepted | deprecated | superseded-by:NNN
+frappe_version: "v16"
+frappe_ctl_version: "0.1.0"   # match package.json at time of decision
+tags: []                  # e.g. [auth, http, frappe-quirk, safety]
+---
+```
+
+Body sections: `## Decision` (1 sentence) · `## Context` (why forced) · `## Consequences` (✅ pros, ⚠️ tradeoffs).
+
+Grep patterns:
+```bash
+grep -rl "status: accepted" docs/adr/       # all accepted
+grep -rl "tags:.*auth" docs/adr/            # auth decisions
+grep -rl "frappe-quirk" docs/adr/           # Frappe-specific gotchas
+grep -rl "superseded-by" docs/adr/          # deprecated choices
+```
 
 ## Adding a New App
 

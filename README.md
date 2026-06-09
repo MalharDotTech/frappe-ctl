@@ -211,7 +211,30 @@ src/
   output.ts           Table / CSV formatters
   commands/           One file per verb (get, describe, create, ...)
   __fixtures__/       Shared mock API responses for tests
+docs/
+  adr/                Architecture Decision Records — why, not what
+    0000-template.md
+    YYYYMMDD-NNN-title.md   (one file per decision, dated)
 ```
+
+---
+
+## Architecture Decisions (ADRs)
+
+Design choices live in `docs/adr/`. Each file documents one decision: what was chosen, why, and the tradeoffs. File names are date-prefixed so the timeline is visible at a glance.
+
+```bash
+# List all accepted decisions
+grep -rl "status: accepted" docs/adr/
+
+# Find decisions about auth
+grep -rl "tags:.*auth" docs/adr/
+
+# See every Frappe quirk we hit
+grep -rl "frappe-quirk" docs/adr/
+```
+
+Current decisions: [001 auth header](docs/adr/20260610-001-auth-header-format.md) · [002 kubectl grammar](docs/adr/20260610-002-kubectl-grammar.md) · [003 zero deps](docs/adr/20260610-003-zero-dependencies.md) · [004 config functions](docs/adr/20260610-004-config-functions-not-constants.md) · [005 listDocTypes POST](docs/adr/20260610-005-listdoctypes-post-not-get.md) · [006 in filter](docs/adr/20260610-006-in-filter-comma-string.md) · [007 delete --force](docs/adr/20260610-007-delete-requires-force.md) · [008 TTY output](docs/adr/20260610-008-tty-output-detection.md) · [009 OAuth PKCE](docs/adr/20260610-009-oauth-pkce-explicit-client-id.md)
 
 ---
 
