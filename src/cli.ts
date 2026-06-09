@@ -476,8 +476,13 @@ async function main(): Promise<void> {
       break;
     }
 
+    case "agent-context": {
+      await cmdAgentContext();
+      break;
+    }
+
     default: {
-      const known = ["get", "describe", "apply", "create", "patch", "delete", "bulk", "submit", "cancel", "call", "report", "resources", "logs", "workflow", "attach", "print"];
+      const known = ["get", "describe", "apply", "create", "patch", "delete", "bulk", "submit", "cancel", "call", "report", "resources", "logs", "workflow", "attach", "print", "agent-context"];
       die(`Unknown verb '${args.verb}'. Valid verbs: ${known.join(", ")}`);
     }
   }

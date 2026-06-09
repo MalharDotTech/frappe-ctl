@@ -201,11 +201,17 @@ export class FrappeClient {
     return this.callMethod<Record<string, unknown>>("frappe.client.cancel", { doc });
   }
 
+  // Fetches DocField rows instead of the full DocType document.
+  // Full DocType for wide doctypes (Sales Order ~200 fields) exceeds Frappe Cloud's 64KB
+  // Nginx response limit, causing truncated JSON. DocField query returns ~8KB for same schema.
   async getDocTypeMeta(doctype: string): Promise<Record<string, unknown>> {
-    return this.callMethod<Record<string, unknown>>("frappe.client.get", {
-      doctype: "DocType",
-      name: doctype,
+    const fields = await this.listDocs("DocField", {
+      filters: [["parent", "=", doctype]],
+      fields: ["fieldname", "fieldtype", "label", "reqd", "options", "description", "default"],
+      limit: 500,
+      orderBy: "idx asc",
     });
+    return { name: doctype, fields };
   }
 
   async runReport(

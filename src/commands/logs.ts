@@ -17,24 +17,39 @@ export async function cmdLogs(client: FrappeClient, args: LogsArgs): Promise<voi
     filters.push(["method", "like", `%${args.method}%`]);
   }
 
-  const docs = await client.listDocs("Error Log", {
-    filters,
-    fields: ["name", "method", "error", "creation"],
-    limit: args.limit ?? 20,
-    orderBy: "creation desc",
-  });
-
-  // Client-side exclude filter — Frappe's `not like` with multiple values needs OR logic
+  const userLimit = args.limit ?? 20;
   const excludePatterns = args.noDefaultExclude
     ? (args.exclude ?? [])
     : [...DEFAULT_EXCLUDE, ...(args.exclude ?? [])];
 
-  const filtered = excludePatterns.length
+  // Fetch extra entries when default-exclude is active — server-side limit applies before
+  // client-side filtering, so limit=20 could return 0 useful entries if all are noise.
+  const fetchLimit = excludePatterns.length ? userLimit * 3 : userLimit;
+
+  const docs = await client.listDocs("Error Log", {
+    filters,
+    fields: ["name", "method", "error", "creation"],
+    limit: fetchLimit,
+    orderBy: "creation desc",
+  });
+
+  // Client-side exclude filter — Frappe's `not like` with multiple values needs OR logic
+  const filtered = (excludePatterns.length
     ? docs.filter((d) => {
         const m = String(d["method"] ?? "").toLowerCase();
         return !excludePatterns.some((p) => m.includes(p.toLowerCase()));
       })
-    : docs;
+    : docs
+  ).slice(0, userLimit);
+
+  const skipped = docs.length - filtered.length;
+
+  // Always warn to stderr so JSON stdout stays clean and user knows entries were hidden
+  if (skipped > 0) {
+    process.stderr.write(
+      `(${skipped} entries hidden by default exclude filter — use --no-default-exclude to show all)\n`,
+    );
+  }
 
   const fmt = args.format ?? (process.stdout.isTTY ? "table" : "json");
 
@@ -44,14 +59,11 @@ export async function cmdLogs(client: FrappeClient, args: LogsArgs): Promise<voi
   }
 
   if (!filtered.length) {
-    const skipped = docs.length - filtered.length;
-    console.log(`No error logs found.${skipped ? ` (${skipped} excluded by default filter — use --no-default-exclude to show)` : ""}`);
+    console.log(`No error logs found.`);
     return;
   }
 
   if (fmt === "table") {
-    const skipped = docs.length - filtered.length;
-    if (skipped) console.log(`(${skipped} entries hidden by default exclude filter — use --no-default-exclude to show all)\n`);
     const header = `${"NAME".padEnd(12)} ${"CREATION".padEnd(20)} METHOD`;
     console.log(header);
     console.log("-".repeat(72));

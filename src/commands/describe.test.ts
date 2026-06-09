@@ -5,6 +5,8 @@ import { doctypeMetaResponse } from "../__fixtures__/api-responses.ts";
 
 const client = new FrappeClient({ url: "http://test.localhost", apiKey: "k", apiSecret: "s" });
 
+// getDocTypeMeta now uses listDocs("DocField") — GET /api/resource/DocField?filters=...
+// Response shape is { data: fields[] }, not { message: { name, fields } }
 function mockFetch(body: unknown, status = 200) {
   return spyOn(globalThis, "fetch").mockResolvedValueOnce(
     new Response(JSON.stringify(body), { status }),
@@ -14,20 +16,21 @@ function mockFetch(body: unknown, status = 200) {
 describe("cmdDescribe", () => {
   afterEach(() => spyOn(globalThis, "fetch").mockRestore());
 
-  it("calls getDocTypeMeta with the correct doctype", async () => {
-    const spy = mockFetch({ message: doctypeMetaResponse });
+  it("queries DocField table with doctype filter", async () => {
+    const spy = mockFetch({ data: doctypeMetaResponse.fields });
     const logs: string[] = [];
     spyOn(console, "log").mockImplementation((m) => logs.push(String(m)));
 
     await cmdDescribe(client, { doctype: "Sales Order", format: "json" });
 
-    const [, options] = spy.mock.calls[0] as [string, RequestInit];
-    const body = JSON.parse(options.body as string) as Record<string, unknown>;
-    expect(body["name"]).toBe("Sales Order");
+    const [url] = spy.mock.calls[0] as [string];
+    const decoded = decodeURIComponent(url).replace(/\+/g, " ");
+    expect(decoded).toContain("DocField");
+    expect(decoded).toContain("Sales Order");
   });
 
   it("outputs all fields from the doctype meta", async () => {
-    mockFetch({ message: doctypeMetaResponse });
+    mockFetch({ data: doctypeMetaResponse.fields });
     const logs: string[] = [];
     spyOn(console, "log").mockImplementation((m) => logs.push(String(m)));
 
@@ -39,7 +42,7 @@ describe("cmdDescribe", () => {
   });
 
   it("table format shows fieldname, fieldtype, label, reqd columns", async () => {
-    mockFetch({ message: doctypeMetaResponse });
+    mockFetch({ data: doctypeMetaResponse.fields });
     const logs: string[] = [];
     spyOn(console, "log").mockImplementation((m) => logs.push(String(m)));
 
@@ -52,7 +55,7 @@ describe("cmdDescribe", () => {
   });
 
   it("marks required fields clearly in table", async () => {
-    mockFetch({ message: doctypeMetaResponse });
+    mockFetch({ data: doctypeMetaResponse.fields });
     const logs: string[] = [];
     spyOn(console, "log").mockImplementation((m) => logs.push(String(m)));
 

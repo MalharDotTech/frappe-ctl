@@ -34,17 +34,28 @@ describe("cmdLogs", () => {
     const spy = mockFetch(logsResponse);
     spyOn(console, "log").mockImplementation(() => {});
 
-    await cmdLogs(client, {});
+    // noDefaultExclude: true disables the 3x pre-filter multiplier — isolates limit param
+    await cmdLogs(client, { noDefaultExclude: true });
 
     const [url] = spy.mock.calls[0] as [string];
     expect(url).toContain("limit_page_length=20");
   });
 
-  it("respects custom limit", async () => {
+  it("multiplies fetch limit when default excludes are active", async () => {
     const spy = mockFetch(logsResponse);
     spyOn(console, "log").mockImplementation(() => {});
 
     await cmdLogs(client, { limit: 5 });
+
+    const [url] = spy.mock.calls[0] as [string];
+    expect(url).toContain("limit_page_length=15"); // 5 * 3
+  });
+
+  it("respects custom limit with no excludes", async () => {
+    const spy = mockFetch(logsResponse);
+    spyOn(console, "log").mockImplementation(() => {});
+
+    await cmdLogs(client, { limit: 5, noDefaultExclude: true });
 
     const [url] = spy.mock.calls[0] as [string];
     expect(url).toContain("limit_page_length=5");
