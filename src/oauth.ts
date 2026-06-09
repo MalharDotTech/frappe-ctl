@@ -90,7 +90,8 @@ export function startLocalServer(
         const errorDesc = url.searchParams.get("error_description") ?? "";
 
         clearTimeout(timer);
-        server.stop(true);
+        // Defer stop so the response is fully sent before the server closes
+        setTimeout(() => server.stop(true), 1000);
 
         if (error) {
           reject(new Error(`OAuth denied: ${error}${errorDesc ? ` — ${errorDesc}` : ""}`));
