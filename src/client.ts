@@ -80,14 +80,18 @@ export class FrappeClient {
       let serverMessage: string | undefined;
       try {
         const parsed = JSON.parse(text) as { exc_type?: string; _server_messages?: string; exception?: string };
-        serverMessage =
-          parsed.exception ??
-          parsed.exc_type ??
-          (parsed._server_messages
-            ? (JSON.parse(parsed._server_messages) as string[])[0]
-            : undefined);
+        if (parsed._server_messages) {
+          // Frappe double-encodes: outer JSON array of inner JSON-encoded {message,title} strings
+          try {
+            const inner = (JSON.parse(parsed._server_messages) as string[])[0] ?? "{}";
+            serverMessage = (JSON.parse(inner) as { message?: string }).message ?? inner;
+          } catch {
+            serverMessage = parsed._server_messages;
+          }
+        }
+        serverMessage ??= parsed.exception ?? parsed.exc_type;
       } catch {
-        serverMessage = text.slice(0, 200);
+        serverMessage = text.slice(0, 300);
       }
       throw new FrappeRequestError(res.status, `HTTP ${res.status} ${res.statusText}`, serverMessage);
     }
@@ -186,16 +190,15 @@ export class FrappeClient {
   }
 
   async submitDoc(doctype: string, name: string): Promise<Record<string, unknown>> {
-    return this.callMethod<Record<string, unknown>>("frappe.client.submit", {
-      doc: { doctype, name },
-    });
+    // frappe.client.submit requires the full document object — {doctype,name} alone returns 417
+    const doc = await this.getDoc(doctype, name);
+    return this.callMethod<Record<string, unknown>>("frappe.client.submit", { doc });
   }
 
   async cancelDoc(doctype: string, name: string): Promise<Record<string, unknown>> {
-    return this.callMethod<Record<string, unknown>>("frappe.client.cancel", {
-      doctype,
-      name,
-    });
+    // frappe.client.cancel same requirement as submit — needs full doc
+    const doc = await this.getDoc(doctype, name);
+    return this.callMethod<Record<string, unknown>>("frappe.client.cancel", { doc });
   }
 
   async getDocTypeMeta(doctype: string): Promise<Record<string, unknown>> {

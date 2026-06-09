@@ -150,6 +150,8 @@ frappe-ctl auth logout                                        # revoke + delete 
 # Ops + discovery
 frappe-ctl next logs --limit 20
 frappe-ctl next logs --method submit
+frappe-ctl next logs --exclude-method raven,sync_invalid_tokens  # suppress scheduler noise
+frappe-ctl next logs --no-default-exclude                        # show everything
 frappe-ctl next resources
 frappe-ctl hr resources -o table
 
@@ -203,7 +205,7 @@ frappe-ctl profile add uat --url http://localhost:8080 --key k --secret s \
 bun test
 ```
 
-168 tests, colocated with source (`*.test.ts`). Pattern: BDD spec (`frappe-ctl.md`) → TDD (`*.test.ts`) → implementation. HTTP layer mocked via `spyOn(globalThis, "fetch")` — no live server needed.
+177 tests, colocated with source (`*.test.ts`). Pattern: BDD spec (`frappe-ctl.md`) → TDD (`*.test.ts`) → implementation. HTTP layer mocked via `spyOn(globalThis, "fetch")` — no live server needed.
 
 ---
 
@@ -241,7 +243,7 @@ grep -rl "tags:.*auth" docs/adr/
 grep -rl "frappe-quirk" docs/adr/
 ```
 
-Current decisions: [001 auth header](docs/adr/20260610-001-auth-header-format.md) · [002 kubectl grammar](docs/adr/20260610-002-kubectl-grammar.md) · [003 zero deps](docs/adr/20260610-003-zero-dependencies.md) · [004 config functions](docs/adr/20260610-004-config-functions-not-constants.md) · [005 listDocTypes POST](docs/adr/20260610-005-listdoctypes-post-not-get.md) · [006 in filter](docs/adr/20260610-006-in-filter-comma-string.md) · [007 delete --force](docs/adr/20260610-007-delete-requires-force.md) · [008 TTY output](docs/adr/20260610-008-tty-output-detection.md) · [009 OAuth PKCE](docs/adr/20260610-009-oauth-pkce-explicit-client-id.md) · [010 bench out of scope](docs/adr/20260610-010-bench-out-of-scope.md)
+Current decisions: [001 auth header](docs/adr/20260610-001-auth-header-format.md) · [002 kubectl grammar](docs/adr/20260610-002-kubectl-grammar.md) · [003 zero deps](docs/adr/20260610-003-zero-dependencies.md) · [004 config functions](docs/adr/20260610-004-config-functions-not-constants.md) · [005 listDocTypes POST](docs/adr/20260610-005-listdoctypes-post-not-get.md) · [006 in filter](docs/adr/20260610-006-in-filter-comma-string.md) · [007 delete --force](docs/adr/20260610-007-delete-requires-force.md) · [008 TTY output](docs/adr/20260610-008-tty-output-detection.md) · [009 OAuth PKCE](docs/adr/20260610-009-oauth-pkce-explicit-client-id.md) · [010 bench out of scope](docs/adr/20260610-010-bench-out-of-scope.md) · [011 fixed OAuth port](docs/adr/20260610-011-fixed-oauth-redirect-port.md)
 
 ---
 

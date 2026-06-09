@@ -79,6 +79,18 @@ export const updateResponse = {
   },
 };
 
+// Full doc returned by getDoc before submit/cancel — Frappe requires the whole doc
+export const salesOrderDocResponse = {
+  data: {
+    name: "SO-2024-00001",
+    doctype: "Sales Order",
+    docstatus: 0,
+    status: "Draft",
+    customer: "Magic Peacock Studio",
+    grand_total: 14000,
+  },
+};
+
 export const submitResponse = {
   message: {
     name: "SO-2024-00001",

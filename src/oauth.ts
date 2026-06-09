@@ -71,7 +71,13 @@ export function startLocalServer(
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       server.stop(true);
-      reject(new Error("OAuth timeout — no redirect received within 120s. Try again."));
+      reject(new Error(
+        `OAuth timeout — no redirect received within 120s.\n\n` +
+        `Most likely cause: redirect URI mismatch.\n` +
+        `Your OAuth Client must have exactly this URI registered:\n` +
+        `  http://localhost:${port}\n\n` +
+        `Fix: Awesomebar → "OAuth Client" → edit → add "http://localhost:${port}" to Redirect URIs.`,
+      ));
     }, timeoutMs);
 
     const server = Bun.serve({
@@ -88,29 +94,64 @@ export function startLocalServer(
 
         if (error) {
           reject(new Error(`OAuth denied: ${error}${errorDesc ? ` — ${errorDesc}` : ""}`));
-          return htmlResponse("Authorization failed.", "You may close this window.");
+          return errorPage(`${error}${errorDesc ? `: ${errorDesc}` : ""}`);
         }
 
         if (!code || !state) {
           reject(new Error("OAuth redirect missing code or state parameter"));
-          return htmlResponse("Authorization failed.", "Missing parameters.");
+          return errorPage("Missing code or state parameter in redirect.");
         }
 
         resolve({ code, state });
-        return htmlResponse(
-          "Authorization successful!",
-          "You may close this window and return to the terminal.",
-        );
+        return successPage();
       },
     });
   });
 }
 
-function htmlResponse(heading: string, body: string): Response {
+function errorPage(message: string): Response {
+  return new Response(styledPage("✗", "#f85149", "Authorization Failed", message, false), {
+    headers: { "Content-Type": "text/html" },
+  });
+}
+
+function successPage(): Response {
   return new Response(
-    `<html><body><h2>${heading}</h2><p>${body}</p></body></html>`,
+    styledPage("✓", "#3fb950", "Authenticated", "You may close this tab.", true),
     { headers: { "Content-Type": "text/html" } },
   );
+}
+
+function styledPage(icon: string, iconColor: string, heading: string, sub: string, autoClose: boolean): string {
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>frappe-ctl</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0d1117; color: #e6edf3;
+      display: flex; align-items: center; justify-content: center; height: 100vh;
+    }
+    .card { text-align: center; padding: 2.5rem 3rem; }
+    .icon { font-size: 3.5rem; color: ${iconColor}; margin-bottom: 0.75rem; }
+    h1 { font-size: 1.4rem; font-weight: 600; margin-bottom: 0.5rem; }
+    .brand { font-size: 0.75rem; color: #8b949e; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 1.5rem; }
+    .sub { color: #8b949e; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">${icon}</div>
+    <div class="brand">frappe-ctl</div>
+    <h1>${heading}</h1>
+    <p class="sub">${sub}</p>
+  </div>
+  ${autoClose ? `<script>setTimeout(() => window.close(), 2500)</script>` : ""}
+</body>
+</html>`;
 }
 
 // ── Browser launch ─────────────────────────────────────────────────────────────

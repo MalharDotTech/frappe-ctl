@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { FrappeClient } from "./client.ts";
+import { FrappeClient, FrappeRequestError } from "./client.ts";
 import { loadConfig, getActiveProfile, profileAdd, profileUse, profileList, profileRemove } from "./config.ts";
 import { resolveApp, APPS } from "./apps.ts";
 import { cmdGet, parseFilter } from "./commands/get.ts";
@@ -35,7 +35,7 @@ function usage(): void {
 USAGE
   frappe-ctl [--site <profile>] <app> <verb> [DocType] [name] [flags]
   frappe-ctl profile <add|use|list|remove> [args]
-  frappe-ctl auth <login|logout|status> [--site <profile>] [--client-id <id>]
+  frappe-ctl auth <login|logout|status> [--site <profile>] [--client-id <id>] [--port <n>]
 
 APPS
 ${Object.values(APPS).map((a) => `  ${a.alias.padEnd(10)} ${a.name}`).join("\n")}
@@ -87,13 +87,14 @@ EXAMPLES
 
 PROFILE MANAGEMENT
   frappe-ctl profile add uat --url http://localhost:8080 --key abc --secret xyz
+  frappe-ctl profile add uat --url http://localhost:8080 --api-key abc --api-secret xyz  (alias)
   frappe-ctl profile use prod
   frappe-ctl profile list
   frappe-ctl profile remove uat
 
 OAUTH (FRAPPE CLOUD)
-  frappe-ctl auth login --client-id <id>       # PKCE flow, opens browser
-  frappe-ctl auth login --site prod --client-id <id>
+  frappe-ctl auth login --client-id <id>             # PKCE flow, opens browser, default port 8756
+  frappe-ctl auth login --site prod --client-id <id> --port 8756
   frappe-ctl auth logout
   frappe-ctl auth status
 `);
@@ -188,7 +189,8 @@ async function main(): Promise<void> {
     switch (sub) {
       case "login": {
         const clientId = parsed.flags["client-id"] ? String(parsed.flags["client-id"]) : undefined;
-        await cmdAuthLogin({ site: parsed.site, clientId });
+        const port = parsed.flags["port"] ? parseInt(String(parsed.flags["port"]), 10) : undefined;
+        await cmdAuthLogin({ site: parsed.site, clientId, port });
         break;
       }
       case "logout":
@@ -211,8 +213,9 @@ async function main(): Promise<void> {
         const name = argv[2] ?? die("profile add requires a name");
         const parsed = parseArgs(argv.slice(3));
         const url = String(parsed.flags["url"] ?? die("--url required"));
-        const key = String(parsed.flags["key"] ?? die("--key required"));
-        const secret = String(parsed.flags["secret"] ?? die("--secret required"));
+        // Accept both --key and --api-key (alias prevents agent hallucination confusion)
+        const key = String(parsed.flags["key"] ?? parsed.flags["api-key"] ?? die("--key (or --api-key) required"));
+        const secret = String(parsed.flags["secret"] ?? parsed.flags["api-secret"] ?? die("--secret (or --api-secret) required"));
         // --app-version next=v16 (repeatable) → { next: "v16" }
         let appVersions: Record<string, string> | undefined;
         if (parsed.appVersions.length) {
@@ -411,7 +414,10 @@ async function main(): Promise<void> {
     case "logs": {
       const limit = args.flags["limit"] ? parseInt(String(args.flags["limit"]), 10) : 20;
       const method = args.flags["method"] ? String(args.flags["method"]) : undefined;
-      await cmdLogs(client, { limit, method, format: fmt });
+      const excludeRaw = args.flags["exclude-method"] ? String(args.flags["exclude-method"]) : undefined;
+      const exclude = excludeRaw ? excludeRaw.split(",").map((s) => s.trim()) : undefined;
+      const noDefaultExclude = args.flags["no-default-exclude"] === true;
+      await cmdLogs(client, { limit, method, exclude, noDefaultExclude, format: fmt });
       break;
     }
 
@@ -472,7 +478,11 @@ async function main(): Promise<void> {
 }
 
 main().catch((err: unknown) => {
-  const msg = err instanceof Error ? err.message : String(err);
-  console.error(`error: ${msg}`);
+  if (err instanceof FrappeRequestError) {
+    console.error(`error: ${err.message}`);
+    if (err.serverMessage) console.error(`       ${err.serverMessage}`);
+  } else {
+    console.error(`error: ${err instanceof Error ? err.message : String(err)}`);
+  }
   process.exit(1);
 });

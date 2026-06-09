@@ -15,6 +15,7 @@ import type { StoredToken } from "../token-store.ts";
 export interface AuthLoginArgs {
   site?: string;      // profile name override
   clientId?: string;  // --client-id flag (stored in profile after first use)
+  port?: number;      // --port flag (default 8756 — must match registered redirect URI exactly)
 }
 
 export interface AuthLogoutArgs {
@@ -33,21 +34,22 @@ export async function cmdAuthLogin(args: AuthLoginArgs): Promise<void> {
   const profile = getActiveProfile(cfg, args.site);
 
   const clientId = args.clientId ?? profile.client_id;
+  // Fixed default port — Frappe OAuth requires exact redirect URI match.
+  // Random port would change every run and never match the registered URI (ADR-011).
+  const port = args.port ?? 8756;
+  const redirectUri = `http://localhost:${port}`;
+
   if (!clientId) {
     throw new Error(
       `No client_id configured for profile '${profileName}'.\n\n` +
       `Steps:\n` +
       `  1. Open ${profile.url}\n` +
       `  2. Awesomebar → "OAuth Client" → New\n` +
-      `  3. Set redirect URI: http://localhost:<any_port>\n` +
+      `  3. Set redirect URI: ${redirectUri}\n` +
       `  4. Copy the Client ID\n` +
       `  5. Run: frappe-ctl auth login --client-id <id>\n`,
     );
   }
-
-  // Random port in ephemeral range — registered redirect URI must use explicit port (Frappe quirk)
-  const port = 49152 + Math.floor(Math.random() * 16383);
-  const redirectUri = `http://localhost:${port}`;
 
   const verifier = generateCodeVerifier();
   const challenge = await generateCodeChallenge(verifier);
