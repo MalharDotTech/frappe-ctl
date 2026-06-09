@@ -134,6 +134,12 @@ frappe-ctl next print "Sales Invoice" SINV-001 --format "GST Tax Invoice" --outp
 frappe-ctl frappe call frappe.client.get_count --data '{"doctype":"User"}'
 frappe-ctl next report "Accounts Receivable" --filter '{"company":"Acme"}'
 
+# Bulk ops (paginated — works across thousands of docs)
+frappe-ctl next bulk patch SalesOrder --filter "status=Draft" --data '{"status":"Cancelled"}' --dry-run
+frappe-ctl next bulk patch SalesOrder --filter "status=Draft" --data '{"status":"Cancelled"}'
+frappe-ctl next bulk delete SalesOrder --filter "status=Cancelled" --force
+# → { "total": 12, "success": 11, "failed": 1, "errors": [...] }
+
 # Ops + discovery
 frappe-ctl next logs --limit 20
 frappe-ctl next logs --method submit
@@ -190,7 +196,7 @@ frappe-ctl profile add uat --url http://localhost:8080 --key k --secret s \
 bun test
 ```
 
-126 tests, colocated with source (`*.test.ts`). Pattern: BDD spec (`frappe-ctl.md`) → TDD (`*.test.ts`) → implementation. HTTP layer mocked via `spyOn(globalThis, "fetch")` — no live server needed.
+134 tests, colocated with source (`*.test.ts`). Pattern: BDD spec (`frappe-ctl.md`) → TDD (`*.test.ts`) → implementation. HTTP layer mocked via `spyOn(globalThis, "fetch")` — no live server needed.
 
 ---
 
@@ -244,6 +250,7 @@ An MCP adapter will wrap `client.ts` as a stdio MCP server, exposing typed tools
 | `logs` | Tail Frappe Error Log — ops debugging |
 | `attach` | Upload files to Sales Invoices, Projects, Purchase Orders |
 | `print` | Download Sales Invoice / SO as PDF via any print format |
+| `bulk` | Patch or delete many docs matching a filter in one command |
 
 ### ERPNext "done done" checklist (before moving to other apps)
 
@@ -255,10 +262,10 @@ An MCP adapter will wrap `client.ts` as a stdio MCP server, exposing typed tools
 - [x] `print` — PDF download via print format
 - [x] `logs` — Frappe Error Log tail
 - [x] `call`, `report`, `resources` — power verbs
+- [x] `bulk` — filter-scoped patch/delete, paginated, partial-failure tolerant
 - [x] `--dry-run` on all mutations
 - [x] `FRAPPE_CTL_READONLY=1` — hard-block mutations
 - [x] `agent-context` — machine-readable schema for LLM tool registration
-- [ ] `bulk` — filter-scoped patch/delete in one command
 - [ ] Frappe Cloud auth — OAuth PKCE for `*.erpnext.com` and `*.frappe.cloud`
 
 ---
@@ -275,8 +282,8 @@ An MCP adapter will wrap `client.ts` as a stdio MCP server, exposing typed tools
 - [x] `--dry-run` on all mutations
 - [x] `FRAPPE_CTL_READONLY=1` — hard-block mutations for read-only agent sessions
 - [x] `agent-context` — versioned JSON schema for LLM tool discovery
+- [x] `bulk` — filter-scoped patch/delete, paginated (`listAll`), partial-failure tolerant
 - [x] Error enumeration — unknown verb lists all valid verbs
-- [ ] `bulk` — filter-scoped patch/delete in one command
 - [ ] Frappe Cloud auth — OAuth PKCE for `*.erpnext.com` and `*.frappe.cloud`
 
 ### Phase 2 — Agent-native hardening

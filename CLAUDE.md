@@ -87,6 +87,7 @@ src/
     attach.ts         multipart file upload
     print.ts          binary PDF download
     logs.ts           Frappe Error Log tail
+    bulk.ts           filter-scoped patch/delete with listAll pagination
     call.ts           raw whitelisted method call
     report.ts         saved Report runner
     resources.ts      DocType lister per app
@@ -161,8 +162,9 @@ Drawn from gogcli, Trevin's 10 principles, and openclaw integration requirements
 ### Remaining before ERPNext "done done"
 | Item | What to build |
 |------|--------------|
-| **`bulk` flag** | Filter-scoped patch/delete — `frappe-ctl next bulk patch SalesOrder --filter "status=Draft" --data '{"status":"Cancelled"}'` |
 | **Frappe Cloud auth** | OAuth PKCE for `*.erpnext.com` and `*.frappe.cloud` — keep entirely separate from self-hosted `token key:secret` path. Never conflate. |
+
+Everything else is shipped. `bulk` done ✅.
 
 ### Phase 2 targets (agent hardening)
 | Principle | What to build |
@@ -195,6 +197,7 @@ Drawn from gogcli, Trevin's 10 principles, and openclaw integration requirements
 | `getDocTypeMeta(doctype)` | POST `frappe.client.get` on DocType | Returns `res.message` |
 | `runReport(name, filters?)` | POST `frappe.desk.query_report.run` | Returns `ReportResult` |
 | `listDocTypes(modules?)` | POST `frappe.client.get_list` | POST not GET — URL length limit |
+| `listAll(doctype, filters?, fields?)` | GET loop via `listDocs` | Paginates 100/page until page < 100. Returns all matching docs. |
 | `uploadFile(doctype, docname, filename, buffer, isPrivate)` | POST `upload_file` multipart | Returns `res.message` — NOT JSON body |
 | `downloadPdf(doctype, name, format?, noLetterhead?)` | GET `frappe.utils.print_format.download_pdf` | Returns `Uint8Array` — binary, not JSON |
 
@@ -212,3 +215,6 @@ Drawn from gogcli, Trevin's 10 principles, and openclaw integration requirements
 | `download_pdf` response | Binary response, not JSON. Don't call `res.text()` or `JSON.parse()`. Use `res.arrayBuffer()`. |
 | URLSearchParams spaces | Encodes spaces as `+` not `%20`. Use `.replace(/\+/g, ' ')` before `decodeURIComponent` in tests. |
 | workflow method | `frappe.model.workflow.apply_workflow` takes `{doc: {doctype, name}, action}` — `doc` is nested object. |
+| `listAll` pagination boundary | Stops when page returns < 100 docs (PAGE constant). Tests must NOT include an empty-page mock when count < 100 — it gets consumed as the next op's response. |
+| bulk mock count | `bulk patch` on N docs needs N+1 fetch mocks: 1 list call + N PUT calls (assuming N < 100). Add extra list mocks only when testing >100-doc pagination. |
+| bulk result shape | Always outputs `{ total, success, failed, errors[] }` JSON to stdout even on full success. Never throws on per-doc failure — catches and records. |
