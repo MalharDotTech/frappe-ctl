@@ -4,6 +4,13 @@ const SCHEMA_VERSION = "1";
 
 const VERBS = [
   {
+    name: "apply",
+    description: "Create or update a doc from a JSON file. Has name → update, no name → create. Accepts - for stdin.",
+    readonly_safe: false,
+    flags: ["--file <path> (required, or - for stdin)", "--dry-run", "-o json|table"],
+    example: "frappe-ctl next apply --file customer.json",
+  },
+  {
     name: "get",
     description: "List docs or fetch one by name",
     readonly_safe: true,
@@ -72,6 +79,13 @@ const VERBS = [
     readonly_safe: true,
     flags: ["-o json|table|csv"],
     example: "frappe-ctl next resources",
+  },
+  {
+    name: "logs",
+    description: "Tail Frappe Error Log — most recent entries first.",
+    readonly_safe: true,
+    flags: ["--limit n (default 20)", "--method <substring> filter by method name", "-o json|table|csv"],
+    example: "frappe-ctl next logs --limit 50 --method submit",
   },
 ];
 

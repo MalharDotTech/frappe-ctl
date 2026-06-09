@@ -10,6 +10,8 @@ import { cmdCall } from "./commands/call.ts";
 import { cmdReport } from "./commands/report.ts";
 import { cmdResources } from "./commands/resources.ts";
 import { cmdAgentContext } from "./commands/agent-context.ts";
+import { cmdApply } from "./commands/apply.ts";
+import { cmdLogs } from "./commands/logs.ts";
 
 const VERSION = "0.1.0";
 
@@ -31,14 +33,16 @@ ${Object.values(APPS).map((a) => `  ${a.alias.padEnd(10)} ${a.name}`).join("\n")
 VERBS
   get        List or fetch docs            frappe-ctl next get SalesOrder [name]
   describe   DocType schema + fields       frappe-ctl next describe SalesOrder
+  apply      Create or update from file    frappe-ctl next apply -f doc.json
   create     Create a new doc              frappe-ctl next create SalesOrder --data '{...}'
   patch      Update fields on a doc        frappe-ctl next patch SalesOrder SO-001 --data '{...}'
   delete     Delete a doc (needs --force)  frappe-ctl next delete SalesOrder SO-001 --force
   submit     Submit (docstatus 0→1)        frappe-ctl next submit SalesOrder SO-001
   cancel     Cancel (docstatus 1→2)        frappe-ctl next cancel SalesOrder SO-001
-  call       Call any whitelisted method     frappe-ctl next call frappe.client.get_list --data '{...}'
-  report     Run a saved ERPNext Report      frappe-ctl next report "Project Billing Summary"
-  resources  List all DocTypes for app       frappe-ctl next resources
+  call       Call any whitelisted method   frappe-ctl next call frappe.client.get_list --data '{...}'
+  report     Run a saved ERPNext Report    frappe-ctl next report "Project Billing Summary"
+  resources  List all DocTypes for app     frappe-ctl next resources
+  logs       Tail Frappe error log         frappe-ctl next logs [--limit 20] [--method submit]
   agent-context  Machine-readable schema (for LLM tool registration)
 
 FLAGS
@@ -96,6 +100,8 @@ function parseArgs(argv: string[]): ParsedArgs {
 
     if (arg === "--site" || arg === "-s") {
       result.site = argv[++i] ?? die("--site requires a value");
+    } else if (arg === "--file") {
+      result.flags["file"] = argv[++i] ?? die("--file requires a value");
     } else if (arg === "--filter" || arg === "-f") {
       result.filters.push(argv[++i] ?? die("--filter requires a value"));
     } else if (arg === "--dry-run") {
@@ -335,8 +341,21 @@ async function main(): Promise<void> {
       break;
     }
 
+    case "apply": {
+      const file = String(args.flags["file"] ?? die(`--file required. Example: frappe-ctl ${args.app} apply --file doc.json`));
+      await cmdApply(client, { file, format: fmt, dryRun: args.dryRun });
+      break;
+    }
+
+    case "logs": {
+      const limit = args.flags["limit"] ? parseInt(String(args.flags["limit"]), 10) : 20;
+      const method = args.flags["method"] ? String(args.flags["method"]) : undefined;
+      await cmdLogs(client, { limit, method, format: fmt });
+      break;
+    }
+
     default: {
-      const known = ["get", "describe", "create", "patch", "delete", "submit", "cancel", "call", "report", "resources"];
+      const known = ["get", "describe", "apply", "create", "patch", "delete", "submit", "cancel", "call", "report", "resources", "logs"];
       die(`Unknown verb '${args.verb}'. Valid verbs: ${known.join(", ")}`);
     }
   }
