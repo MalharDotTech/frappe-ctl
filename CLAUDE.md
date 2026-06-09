@@ -73,11 +73,24 @@ Never silently delete. If `force: false`, throw with message explaining the flag
 ```
 src/
   cli.ts              Entry + arg parser (no external deps)
-  client.ts           All HTTP — getDoc, listDocs, callMethod, etc.
+  client.ts           All HTTP — getDoc, listDocs, callMethod, uploadFile, downloadPdf
   config.ts           Profile CRUD — functions not constants
   apps.ts             App registry — alias, modules, supportedVersions
   output.ts           Table / CSV formatters
-  commands/           One file per verb
+  commands/
+    get.ts            list + single fetch
+    describe.ts       DocType schema
+    apply.ts          create/update from JSON file or stdin
+    write.ts          create, patch, delete
+    lifecycle.ts      submit, cancel
+    workflow.ts       ERPNext workflow action transitions
+    attach.ts         multipart file upload
+    print.ts          binary PDF download
+    logs.ts           Frappe Error Log tail
+    call.ts           raw whitelisted method call
+    report.ts         saved Report runner
+    resources.ts      DocType lister per app
+    agent-context.ts  machine-readable JSON schema
   __fixtures__/       Shared mock responses — update when adding fields
 ```
 
@@ -145,14 +158,11 @@ Drawn from gogcli, Trevin's 10 principles, and openclaw integration requirements
 | `FRAPPE_CTL_CONFIG_DIR` | Sandboxed config per agent session |
 | Bounded responses | Default `--limit 20` on `get` |
 
-### Must implement before calling ERPNext "done done"
-| Principle | What to build |
-|-----------|--------------|
-| **Errors enumerate valid options** | On bad filter op (`===`), list valid ops. On unknown DocType, suggest similar. On bad verb, list all verbs. Never just "invalid input". |
-| **`--dry-run` on mutations** | create/patch/delete/submit/cancel show intended action without writing. Print what would be sent. |
-| **`agent-context` command** | `frappe-ctl agent-context` outputs versioned JSON: all verbs, flags, types, examples. Consumable by LLM tool registration. |
-| **Frappe Cloud auth** | OAuth PKCE for `*.erpnext.com` and `*.frappe.cloud` — different from self-hosted token auth. |
-| **`FRAPPE_CTL_READONLY=1`** | Env var that hard-blocks all mutations. Safe default for read-only agent sessions. |
+### Remaining before ERPNext "done done"
+| Item | What to build |
+|------|--------------|
+| **`bulk` flag** | Filter-scoped patch/delete — `frappe-ctl next bulk patch SalesOrder --filter "status=Draft" --data '{"status":"Cancelled"}'` |
+| **Frappe Cloud auth** | OAuth PKCE for `*.erpnext.com` and `*.frappe.cloud` — keep entirely separate from self-hosted `token key:secret` path. Never conflate. |
 
 ### Phase 2 targets (agent hardening)
 | Principle | What to build |
@@ -169,6 +179,25 @@ Drawn from gogcli, Trevin's 10 principles, and openclaw integration requirements
 
 ---
 
+## client.ts Method Reference
+
+| Method | Transport | Notes |
+|--------|-----------|-------|
+| `getDoc(doctype, name)` | GET `/api/resource/{doctype}/{name}` | Returns `res.data` |
+| `listDocs(doctype, opts)` | GET `/api/resource/{doctype}` | Always sends `fields=["*"]` |
+| `countDocs(doctype, filters?)` | POST `frappe.client.get_count` | Returns number |
+| `createDoc(doctype, data)` | POST `/api/resource/{doctype}` | Returns `res.data` |
+| `updateDoc(doctype, name, data)` | PUT `/api/resource/{doctype}/{name}` | Returns `res.data` |
+| `deleteDoc(doctype, name)` | DELETE `/api/resource/{doctype}/{name}` | Returns void |
+| `callMethod(method, data?)` | POST `/api/method/{method}` | Returns `res.message` |
+| `submitDoc(doctype, name)` | POST `frappe.client.submit` | Returns `res.message` |
+| `cancelDoc(doctype, name)` | POST `frappe.client.cancel` | Returns `res.message` |
+| `getDocTypeMeta(doctype)` | POST `frappe.client.get` on DocType | Returns `res.message` |
+| `runReport(name, filters?)` | POST `frappe.desk.query_report.run` | Returns `ReportResult` |
+| `listDocTypes(modules?)` | POST `frappe.client.get_list` | POST not GET — URL length limit |
+| `uploadFile(doctype, docname, filename, buffer, isPrivate)` | POST `upload_file` multipart | Returns `res.message` — NOT JSON body |
+| `downloadPdf(doctype, name, format?, noLetterhead?)` | GET `frappe.utils.print_format.download_pdf` | Returns `Uint8Array` — binary, not JSON |
+
 ## Known Frappe Quirks
 
 | Quirk | Detail |
@@ -179,3 +208,7 @@ Drawn from gogcli, Trevin's 10 principles, and openclaw integration requirements
 | Report caching | Always pass `ignore_prepared_report: 1` to `frappe.desk.query_report.run` or you get stale data. |
 | submit/cancel | These are ERPNext-specific lifecycle states. `docstatus`: 0=Draft, 1=Submitted, 2=Cancelled. |
 | HTTP 417 | Frappe throws `DataError` (mapped to 417) on disallowed fields or malformed filters — not a transport error. |
+| `upload_file` auth | Does NOT use JSON body — multipart FormData. Auth header same `token key:secret` but no `Content-Type: application/json`. |
+| `download_pdf` response | Binary response, not JSON. Don't call `res.text()` or `JSON.parse()`. Use `res.arrayBuffer()`. |
+| URLSearchParams spaces | Encodes spaces as `+` not `%20`. Use `.replace(/\+/g, ' ')` before `decodeURIComponent` in tests. |
+| workflow method | `frappe.model.workflow.apply_workflow` takes `{doc: {doctype, name}, action}` — `doc` is nested object. |

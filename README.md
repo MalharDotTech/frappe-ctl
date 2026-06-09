@@ -78,32 +78,40 @@ Config lives at `~/.config/frappe-ctl/config.json`. Override location with `FRAP
 |------|------|
 | `get` | List docs or fetch one by name |
 | `describe` | Show DocType schema and field types |
-| `create` | Create a new doc |
+| `apply` | Create or update doc from JSON file (kubectl-style) |
+| `create` | Create a new doc from inline `--data` |
 | `patch` | Update fields on an existing doc |
 | `delete` | Delete a doc (requires `--force`) |
 | `submit` | Submit a doc (docstatus 0 → 1) |
 | `cancel` | Cancel a submitted doc (docstatus 1 → 2) |
+| `workflow` | Apply an ERPNext workflow action (approve/reject/etc) |
 | `call` | Call any whitelisted Frappe method |
 | `report` | Run a saved Frappe Report |
 | `resources` | List all DocTypes for an app |
+| `logs` | Tail Frappe Error Log |
+| `attach` | Upload a file to any doc |
+| `print` | Download doc as PDF via print format |
 
 ---
 
 ## Examples
 
 ```bash
-# List
+# List + fetch
 frappe-ctl next get Customer
 frappe-ctl next get SalesOrder --filter "status=Open" --limit 50
 frappe-ctl next get SalesOrder --filter "status!=Cancelled" --filter "company=Acme"
-
-# Fetch one
 frappe-ctl next get SalesOrder SO-2024-0001
 
 # Schema
 frappe-ctl next describe SalesOrder
 
-# Write
+# Apply from file (create if no name, update if name present)
+frappe-ctl next apply --file customer.json
+frappe-ctl next apply --file so.json --dry-run
+echo '{"doctype":"Customer","customer_name":"Acme"}' | frappe-ctl next apply --file -
+
+# Write (inline data)
 frappe-ctl next create Customer --data '{"customer_name":"Acme","customer_type":"Company"}'
 frappe-ctl next patch SalesOrder SO-001 --data '{"status":"On Hold"}'
 frappe-ctl next delete SalesOrder SO-001 --force
@@ -112,15 +120,29 @@ frappe-ctl next delete SalesOrder SO-001 --force
 frappe-ctl next submit SalesOrder SO-001
 frappe-ctl next cancel SalesOrder SO-001
 
-# Methods
-frappe-ctl frappe call frappe.client.get_count --data '{"doctype":"User"}'
+# Workflow (ERPNext approval flows)
+frappe-ctl next workflow "Sales Order" SO-001 --action "Approve"
+frappe-ctl next workflow "Leave Application" LA-001 --action "Reject"
 
-# Reports
+# File operations
+frappe-ctl next attach "Sales Invoice" SINV-001 --file invoice.pdf
+frappe-ctl next attach "Sales Invoice" SINV-001 --file contract.pdf --private
+frappe-ctl next print "Sales Invoice" SINV-001 --output sinv-001.pdf
+frappe-ctl next print "Sales Invoice" SINV-001 --format "GST Tax Invoice" --output sinv-001.pdf
+
+# Methods + reports
+frappe-ctl frappe call frappe.client.get_count --data '{"doctype":"User"}'
 frappe-ctl next report "Accounts Receivable" --filter '{"company":"Acme"}'
 
-# Discover what DocTypes an app exposes
+# Ops + discovery
+frappe-ctl next logs --limit 20
+frappe-ctl next logs --method submit
 frappe-ctl next resources
 frappe-ctl hr resources -o table
+
+# Agent tooling
+frappe-ctl agent-context
+FRAPPE_CTL_READONLY=1 frappe-ctl next get Customer   # safe read-only mode
 
 # Output formats
 frappe-ctl next get Customer -o json   # default when piped
@@ -168,7 +190,7 @@ frappe-ctl profile add uat --url http://localhost:8080 --key k --secret s \
 bun test
 ```
 
-101 tests, colocated with source (`*.test.ts`). Pattern: BDD spec (`frappe-ctl.md`) → TDD (`*.test.ts`) → implementation. HTTP layer mocked via `spyOn(globalThis, "fetch")` — no live server needed.
+126 tests, colocated with source (`*.test.ts`). Pattern: BDD spec (`frappe-ctl.md`) → TDD (`*.test.ts`) → implementation. HTTP layer mocked via `spyOn(globalThis, "fetch")` — no live server needed.
 
 ---
 
@@ -209,24 +231,35 @@ An MCP adapter will wrap `client.ts` as a stdio MCP server, exposing typed tools
 |------|-----------------|
 | `get` | Fetch Sales Orders, Invoices, Customers, Projects |
 | `describe` | Inspect any DocType schema before writing |
+| `apply` | Create or update doc from JSON file — agent-friendly batch ops |
 | `create` | New Customer, Supplier, Sales Order, Project |
 | `patch` | Update status, amounts, custom fields |
-| `delete` | Remove draft docs (--force required) |
+| `delete` | Remove draft docs (`--force` required) |
 | `submit` | Submit Sales Order, Purchase Invoice, Payment Entry |
 | `cancel` | Cancel submitted docs |
+| `workflow` | Trigger approval flows — approve/reject Leave, Expense, PO, etc. |
 | `call` | Any whitelisted method — `frappe.client.get_count`, custom scripts |
 | `report` | Run Accounts Receivable, Project Billing Summary, etc. |
-| `resources` | Discover all DocTypes in an app's modules |
+| `resources` | Discover all DocTypes in app modules |
+| `logs` | Tail Frappe Error Log — ops debugging |
+| `attach` | Upload files to Sales Invoices, Projects, Purchase Orders |
+| `print` | Download Sales Invoice / SO as PDF via any print format |
 
 ### ERPNext "done done" checklist (before moving to other apps)
 
-- [ ] `workflow` verb — trigger ERPNext workflow actions (approve/reject)
-- [ ] `attach` verb — upload file to a doc (`/api/method/upload_file`)
-- [ ] `print` verb — fetch print format as PDF (`/api/method/frappe.utils.print_format.download_pdf`)
-- [ ] `bulk` flag — `get` + patch/delete across a filtered set in one command
-- [x] `--dry-run` on all mutations — show payload without writing
-- [ ] Frappe Cloud auth — OAuth PKCE flow + token storage for `*.erpnext.com` sites
-- [x] `agent-context` command — machine-readable JSON schema for LLM tool registration
+- [x] Core CRUD verbs: `get`, `describe`, `create`, `patch`, `delete`
+- [x] Lifecycle: `submit`, `cancel`
+- [x] `apply` — file-based create/update (kubectl parity)
+- [x] `workflow` — ERPNext workflow action transitions
+- [x] `attach` — file upload to any doc
+- [x] `print` — PDF download via print format
+- [x] `logs` — Frappe Error Log tail
+- [x] `call`, `report`, `resources` — power verbs
+- [x] `--dry-run` on all mutations
+- [x] `FRAPPE_CTL_READONLY=1` — hard-block mutations
+- [x] `agent-context` — machine-readable schema for LLM tool registration
+- [ ] `bulk` — filter-scoped patch/delete in one command
+- [ ] Frappe Cloud auth — OAuth PKCE for `*.erpnext.com` and `*.frappe.cloud`
 
 ---
 
@@ -234,14 +267,17 @@ An MCP adapter will wrap `client.ts` as a stdio MCP server, exposing typed tools
 
 ### Phase 1 — ERPNext complete (before next app)
 - [x] Core verbs: `get`, `describe`, `create`, `patch`, `delete`, `submit`, `cancel`, `call`, `report`, `resources`
+- [x] `apply` — file-based create/update, stdin support
+- [x] `workflow` — ERPNext workflow action transitions
+- [x] `attach` — multipart file upload to any doc
+- [x] `print` — binary PDF download, pipe or save to file
+- [x] `logs` — Frappe Error Log tail with method filter
 - [x] `--dry-run` on all mutations
-- [x] `FRAPPE_CTL_READONLY=1` env var — hard-block all mutations for read-only agent sessions
-- [x] `agent-context` command — versioned JSON schema for LLM tool discovery
+- [x] `FRAPPE_CTL_READONLY=1` — hard-block mutations for read-only agent sessions
+- [x] `agent-context` — versioned JSON schema for LLM tool discovery
 - [x] Error enumeration — unknown verb lists all valid verbs
-- [ ] `workflow` verb — approve/reject ERPNext workflow states
-- [ ] `attach` / `print` verbs — file upload and PDF export
+- [ ] `bulk` — filter-scoped patch/delete in one command
 - [ ] Frappe Cloud auth — OAuth PKCE for `*.erpnext.com` and `*.frappe.cloud`
-- [ ] `bulk` flag — filter-scoped patch/delete in one command
 
 ### Phase 2 — Agent-native hardening
 - [ ] MCP adapter — `mcp/index.ts` stdio server wrapping `client.ts`, read-only by default
