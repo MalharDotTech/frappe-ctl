@@ -1,6 +1,7 @@
 import { describe, it, expect, spyOn, afterEach } from "bun:test";
 import { FrappeClient } from "../client.ts";
 import { cmdLogs } from "./logs.ts";
+import { captureOutput } from "../__fixtures__/test-helpers.ts";
 
 const client = new FrappeClient({ url: "http://test.localhost", apiKey: "k", apiSecret: "s" });
 
@@ -75,12 +76,12 @@ describe("cmdLogs", () => {
 
   it("json format returns raw array", async () => {
     mockFetch(logsResponse);
-    const logs: string[] = [];
-    spyOn(console, "log").mockImplementation((m) => logs.push(String(m)));
+    const { lines, restore } = captureOutput();
 
-    await cmdLogs(client, { format: "json" });
+    await cmdLogs(client, { format: "json", noDefaultExclude: true });
+    restore();
 
-    const parsed = JSON.parse(logs[0]!) as unknown[];
+    const parsed = JSON.parse(lines[0]!) as unknown[];
     expect(parsed).toHaveLength(2);
   });
 

@@ -11,7 +11,7 @@ export async function cmdReport(client: FrappeClient, args: ReportArgs): Promise
   const fmt = args.format ?? (process.stdout.isTTY ? "table" : "json");
 
   if (fmt === "json") {
-    console.log(JSON.stringify(result, null, 2));
+    process.stdout.write(JSON.stringify(result, null, 2) + "\n");
     return;
   }
 

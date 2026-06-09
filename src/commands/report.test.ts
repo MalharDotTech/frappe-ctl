@@ -2,6 +2,7 @@ import { describe, it, expect, spyOn, afterEach } from "bun:test";
 import { FrappeClient } from "../client.ts";
 import { cmdReport } from "./report.ts";
 import { reportResponse } from "../__fixtures__/api-responses.ts";
+import { captureOutput } from "../__fixtures__/test-helpers.ts";
 
 const client = new FrappeClient({ url: "http://test.localhost", apiKey: "k", apiSecret: "s" });
 
@@ -89,12 +90,12 @@ describe("cmdReport", () => {
 
   it("json format returns columns + result", async () => {
     mockFetch(reportResponse);
-    const logs: string[] = [];
-    spyOn(console, "log").mockImplementation((m) => logs.push(String(m)));
+    const { lines, restore } = captureOutput();
 
     await cmdReport(client, { reportName: "Project Billing Summary", filters: {}, format: "json" });
+    restore();
 
-    const result = JSON.parse(logs[0]!) as { columns: unknown[]; result: unknown[][] };
+    const result = JSON.parse(lines[0]!) as { columns: unknown[]; result: unknown[][] };
     expect(result.columns).toHaveLength(3);
     expect(result.result).toHaveLength(2);
   });

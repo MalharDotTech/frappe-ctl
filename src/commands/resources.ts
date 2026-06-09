@@ -12,7 +12,7 @@ export async function cmdResources(client: FrappeClient, args: ResourcesArgs): P
   const fmt = args.format ?? (process.stdout.isTTY ? "table" : "json");
 
   if (fmt === "json") {
-    console.log(JSON.stringify(docs, null, 2));
+    process.stdout.write(JSON.stringify(docs, null, 2) + "\n");
     return;
   }
 

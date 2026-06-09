@@ -54,7 +54,7 @@ export async function cmdLogs(client: FrappeClient, args: LogsArgs): Promise<voi
   const fmt = args.format ?? (process.stdout.isTTY ? "table" : "json");
 
   if (fmt === "json") {
-    console.log(JSON.stringify(filtered, null, 2));
+    process.stdout.write(JSON.stringify(filtered, null, 2) + "\n");
     return;
   }
 

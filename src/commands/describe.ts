@@ -26,7 +26,7 @@ export async function cmdDescribe(client: FrappeClient, args: DescribeArgs): Pro
     : process.stdout.isTTY ? "table" : "json";
 
   if (fmt === "json") {
-    console.log(JSON.stringify(meta, null, 2));
+    process.stdout.write(JSON.stringify(meta, null, 2) + "\n");
     return;
   }
 

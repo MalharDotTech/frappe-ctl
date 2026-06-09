@@ -164,5 +164,5 @@ export async function cmdAgentContext(): Promise<void> {
     ],
   };
 
-  console.log(JSON.stringify(context, null, 2));
+  process.stdout.write(JSON.stringify(context, null, 2) + "\n");
 }

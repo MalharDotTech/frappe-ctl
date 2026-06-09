@@ -18,6 +18,6 @@ export async function cmdCall(client: FrappeClient, args: CallArgs): Promise<voi
       console.log(`${k.padEnd(30)} ${val}`);
     }
   } else {
-    console.log(JSON.stringify(result, null, 2));
+    process.stdout.write(JSON.stringify(result, null, 2) + "\n");
   }
 }

@@ -26,7 +26,7 @@ interface DeleteArgs {
 export async function cmdCreate(client: FrappeClient, args: CreateArgs): Promise<void> {
   if (args.dryRun) {
     console.log(`[DRY RUN] Would create ${args.doctype}:`);
-    console.log(JSON.stringify(args.data, null, 2));
+    process.stdout.write(JSON.stringify(args.data, null, 2) + "\n");
     return;
   }
   const doc = await client.createDoc(args.doctype, args.data);
@@ -36,7 +36,7 @@ export async function cmdCreate(client: FrappeClient, args: CreateArgs): Promise
 export async function cmdPatch(client: FrappeClient, args: PatchArgs): Promise<void> {
   if (args.dryRun) {
     console.log(`[DRY RUN] Would patch ${args.doctype} ${args.name}:`);
-    console.log(JSON.stringify(args.data, null, 2));
+    process.stdout.write(JSON.stringify(args.data, null, 2) + "\n");
     return;
   }
   const doc = await client.updateDoc(args.doctype, args.name, args.data);

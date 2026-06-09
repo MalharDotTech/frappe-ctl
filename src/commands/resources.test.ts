@@ -3,6 +3,7 @@ import { FrappeClient } from "../client.ts";
 import { cmdResources } from "./resources.ts";
 import { resourcesResponse } from "../__fixtures__/api-responses.ts";
 import { APPS } from "../apps.ts";
+import { captureOutput } from "../__fixtures__/test-helpers.ts";
 
 const client = new FrappeClient({ url: "http://test.localhost", apiKey: "k", apiSecret: "s" });
 
@@ -68,12 +69,12 @@ describe("cmdResources", () => {
 
   it("json format returns raw DocType list", async () => {
     mockFetch(resourcesResponse);
-    const logs: string[] = [];
-    spyOn(console, "log").mockImplementation((m) => logs.push(String(m)));
+    const { lines, restore } = captureOutput();
 
     await cmdResources(client, { appAlias: "next", format: "json" });
+    restore();
 
-    const result = JSON.parse(logs[0]!) as unknown[];
+    const result = JSON.parse(lines[0]!) as unknown[];
     expect(result).toHaveLength(4);
   });
 

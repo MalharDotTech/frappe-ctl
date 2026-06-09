@@ -33,5 +33,5 @@ export async function cmdAttach(client: FrappeClient, args: AttachArgs): Promise
 
   const fileUrl = result["file_url"] ?? result["name"];
   console.log(`Attached: ${filename} → ${fileUrl}`);
-  console.log(JSON.stringify(result, null, 2));
+  process.stdout.write(JSON.stringify(result, null, 2) + "\n");
 }

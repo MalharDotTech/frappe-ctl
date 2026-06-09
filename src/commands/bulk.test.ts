@@ -1,6 +1,7 @@
 import { describe, it, expect, spyOn, afterEach } from "bun:test";
 import { FrappeClient } from "../client.ts";
 import { cmdBulk } from "./bulk.ts";
+import { captureOutput } from "../__fixtures__/test-helpers.ts";
 
 const client = new FrappeClient({ url: "http://test.localhost", apiKey: "k", apiSecret: "s" });
 
@@ -35,8 +36,7 @@ describe("cmdBulk", () => {
   it("dry-run lists affected docs without writing", async () => {
     // list page 1 returns 3, page 2 empty → done
     mockFetch(listPage1, listEmpty);
-    const logs: string[] = [];
-    spyOn(console, "log").mockImplementation((m) => logs.push(String(m)));
+    const { lines, restore } = captureOutput();
 
     await cmdBulk(client, {
       subVerb: "patch",
@@ -46,8 +46,9 @@ describe("cmdBulk", () => {
       force: false,
       dryRun: true,
     });
+    restore();
 
-    const out = logs.join("\n");
+    const out = lines.join("\n");
     expect(out).toContain("[DRY RUN]");
     expect(out).toContain("3");         // count
     expect(out).toContain("SO-001");
@@ -57,8 +58,7 @@ describe("cmdBulk", () => {
     // 2 docs < PAGE(100) → listAll done in 1 call; then 2 PUTs
     const list2 = { data: [{ name: "SO-001" }, { name: "SO-002" }] };
     mockFetch(list2, updateOk, updateOk);
-    const logs: string[] = [];
-    spyOn(console, "log").mockImplementation((m) => logs.push(String(m)));
+    const { lines, restore } = captureOutput();
 
     await cmdBulk(client, {
       subVerb: "patch",
@@ -68,7 +68,8 @@ describe("cmdBulk", () => {
       force: false,
     });
 
-    const result = JSON.parse(logs[logs.length - 1]!) as { success: number; failed: number };
+    restore();
+    const result = JSON.parse(lines[lines.length - 1]!) as { success: number; failed: number };
     expect(result.success).toBe(2);
     expect(result.failed).toBe(0);
   });
@@ -89,8 +90,7 @@ describe("cmdBulk", () => {
     const list2 = { data: [{ name: "SO-001" }, { name: "SO-002" }] };
     const deleteOk = "ok";
     mockFetch(list2, deleteOk, deleteOk);
-    const logs: string[] = [];
-    spyOn(console, "log").mockImplementation((m) => logs.push(String(m)));
+    const { lines, restore } = captureOutput();
 
     await cmdBulk(client, {
       subVerb: "delete",
@@ -100,7 +100,8 @@ describe("cmdBulk", () => {
       force: true,
     });
 
-    const result = JSON.parse(logs[logs.length - 1]!) as { success: number };
+    restore();
+    const result = JSON.parse(lines[lines.length - 1]!) as { success: number };
     expect(result.success).toBe(2);
   });
 
@@ -114,8 +115,7 @@ describe("cmdBulk", () => {
       .mockResolvedValueOnce(failResponse);
     void spy;
 
-    const logs: string[] = [];
-    spyOn(console, "log").mockImplementation((m) => logs.push(String(m)));
+    const { lines, restore } = captureOutput();
 
     await cmdBulk(client, {
       subVerb: "patch",
@@ -125,7 +125,8 @@ describe("cmdBulk", () => {
       force: false,
     });
 
-    const result = JSON.parse(logs[logs.length - 1]!) as { success: number; failed: number };
+    restore();
+    const result = JSON.parse(lines[lines.length - 1]!) as { success: number; failed: number };
     expect(result.success).toBe(1);
     expect(result.failed).toBe(1);
   });
@@ -133,8 +134,7 @@ describe("cmdBulk", () => {
   it("outputs valid JSON result", async () => {
     const list1 = { data: [{ name: "SO-001" }] };
     mockFetch(list1, updateOk);
-    const logs: string[] = [];
-    spyOn(console, "log").mockImplementation((m) => logs.push(String(m)));
+    const { lines, restore } = captureOutput();
 
     await cmdBulk(client, {
       subVerb: "patch",
@@ -144,7 +144,8 @@ describe("cmdBulk", () => {
       force: false,
     });
 
-    const result = JSON.parse(logs[logs.length - 1]!) as { total: number; success: number; failed: number; errors: unknown[] };
+    restore();
+    const result = JSON.parse(lines[lines.length - 1]!) as { total: number; success: number; failed: number; errors: unknown[] };
     expect(result.total).toBe(1);
     expect(result.success).toBe(1);
     expect(result.failed).toBe(0);

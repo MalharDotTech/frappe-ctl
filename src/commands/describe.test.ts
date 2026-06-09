@@ -2,6 +2,7 @@ import { describe, it, expect, spyOn, afterEach } from "bun:test";
 import { FrappeClient } from "../client.ts";
 import { cmdDescribe } from "./describe.ts";
 import { doctypeMetaResponse } from "../__fixtures__/api-responses.ts";
+import { captureOutput } from "../__fixtures__/test-helpers.ts";
 
 const client = new FrappeClient({ url: "http://test.localhost", apiKey: "k", apiSecret: "s" });
 
@@ -28,12 +29,12 @@ describe("cmdDescribe", () => {
 
   it("outputs all fields from the doctype meta", async () => {
     mockFetch({ message: doctypeMetaResponse });
-    const logs: string[] = [];
-    spyOn(console, "log").mockImplementation((m) => logs.push(String(m)));
+    const { lines, restore } = captureOutput();
 
     await cmdDescribe(client, { doctype: "Sales Order", format: "json" });
+    restore();
 
-    const output = JSON.parse(logs[0]!) as { name: string; fields: unknown[] };
+    const output = JSON.parse(lines[0]!) as { name: string; fields: unknown[] };
     expect(output.name).toBe("Sales Order");
     expect(output.fields).toHaveLength(5);
   });

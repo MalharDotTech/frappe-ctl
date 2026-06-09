@@ -37,7 +37,7 @@ export async function cmdApply(client: FrappeClient, args: ApplyArgs): Promise<v
   if (args.dryRun) {
     const action = isUpdate ? `update ${doctype} ${name}` : `create ${doctype}`;
     console.log(`[DRY RUN] Would ${action}:`);
-    console.log(JSON.stringify(doc, null, 2));
+    process.stdout.write(JSON.stringify(doc, null, 2) + "\n");
     return;
   }
 

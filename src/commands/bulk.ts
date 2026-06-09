@@ -41,7 +41,7 @@ export async function cmdBulk(client: FrappeClient, args: BulkArgs): Promise<voi
   const docs = await client.listAll(args.doctype, args.filters, ["name"]);
 
   if (!docs.length) {
-    console.log(JSON.stringify({ total: 0, success: 0, failed: 0, errors: [] }));
+    process.stdout.write(JSON.stringify({ total: 0, success: 0, failed: 0, errors: [] }) + "\n");
     return;
   }
 
@@ -74,5 +74,5 @@ export async function cmdBulk(client: FrappeClient, args: BulkArgs): Promise<voi
     }
   }
 
-  console.log(JSON.stringify(result, null, 2));
+  process.stdout.write(JSON.stringify(result, null, 2) + "\n");
 }

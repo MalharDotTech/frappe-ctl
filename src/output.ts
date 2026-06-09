@@ -20,7 +20,7 @@ export function printDocs(docs: Record<string, unknown>[], format: OutputFormat)
 
   switch (format) {
     case "json":
-      console.log(JSON.stringify(docs, null, 2));
+      process.stdout.write(JSON.stringify(docs, null, 2) + "\n");
       break;
     case "csv":
       printCsv(docs);
@@ -34,7 +34,7 @@ export function printDocs(docs: Record<string, unknown>[], format: OutputFormat)
 export function printDoc(doc: Record<string, unknown>, format: OutputFormat): void {
   switch (format) {
     case "json":
-      console.log(JSON.stringify(doc, null, 2));
+      process.stdout.write(JSON.stringify(doc, null, 2) + "\n");
       break;
     case "csv":
       printCsv([doc]);

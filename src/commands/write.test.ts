@@ -2,6 +2,7 @@ import { describe, it, expect, spyOn, afterEach } from "bun:test";
 import { FrappeClient } from "../client.ts";
 import { cmdCreate, cmdPatch, cmdDelete } from "./write.ts";
 import { createResponse, updateResponse } from "../__fixtures__/api-responses.ts";
+import { captureOutput } from "../__fixtures__/test-helpers.ts";
 
 const client = new FrappeClient({ url: "http://test.localhost", apiKey: "k", apiSecret: "s" });
 
@@ -45,12 +46,12 @@ describe("cmdCreate", () => {
 
   it("outputs the created doc", async () => {
     mockFetch(createResponse);
-    const logs: string[] = [];
-    spyOn(console, "log").mockImplementation((m) => logs.push(String(m)));
+    const { lines, restore } = captureOutput();
 
     await cmdCreate(client, { doctype: "Sales Order", data: {}, format: "json" });
+    restore();
 
-    const doc = JSON.parse(logs[0]!) as Record<string, unknown>;
+    const doc = JSON.parse(lines[0]!) as Record<string, unknown>;
     expect(doc["name"]).toBe("SO-2024-00001");
   });
 });
@@ -78,8 +79,7 @@ describe("cmdPatch", () => {
 
   it("outputs updated doc", async () => {
     mockFetch(updateResponse);
-    const logs: string[] = [];
-    spyOn(console, "log").mockImplementation((m) => logs.push(String(m)));
+    const { lines, restore } = captureOutput();
 
     await cmdPatch(client, {
       doctype: "Sales Order",
@@ -87,8 +87,9 @@ describe("cmdPatch", () => {
       data: { status: "On Hold" },
       format: "json",
     });
+    restore();
 
-    const doc = JSON.parse(logs[0]!) as Record<string, unknown>;
+    const doc = JSON.parse(lines[0]!) as Record<string, unknown>;
     expect(doc["status"]).toBe("On Hold");
   });
 });

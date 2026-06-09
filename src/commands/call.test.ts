@@ -2,6 +2,7 @@ import { describe, it, expect, spyOn, afterEach } from "bun:test";
 import { FrappeClient } from "../client.ts";
 import { cmdCall } from "./call.ts";
 import { callMethodResponse } from "../__fixtures__/api-responses.ts";
+import { captureOutput } from "../__fixtures__/test-helpers.ts";
 
 const client = new FrappeClient({ url: "http://test.localhost", apiKey: "k", apiSecret: "s" });
 
@@ -42,22 +43,22 @@ describe("cmdCall", () => {
 
   it("works without data (empty call)", async () => {
     mockFetch({ message: "pong" });
-    const logs: string[] = [];
-    spyOn(console, "log").mockImplementation((m) => logs.push(String(m)));
+    const { lines, restore } = captureOutput();
 
     await cmdCall(client, { method: "frappe.ping", format: "json" });
+    restore();
 
-    expect(logs[0]).toContain("pong");
+    expect(lines[0]).toContain("pong");
   });
 
   it("outputs raw method response as JSON", async () => {
     mockFetch(callMethodResponse);
-    const logs: string[] = [];
-    spyOn(console, "log").mockImplementation((m) => logs.push(String(m)));
+    const { lines, restore } = captureOutput();
 
     await cmdCall(client, { method: "frappe.client.get_list", data: { doctype: "Sales Order" }, format: "json" });
+    restore();
 
-    const result = JSON.parse(logs[0]!) as unknown[];
+    const result = JSON.parse(lines[0]!) as unknown[];
     expect(Array.isArray(result)).toBe(true);
     expect((result[0] as Record<string, unknown>)["name"]).toBe("SO-2024-00001");
   });
