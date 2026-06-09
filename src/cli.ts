@@ -16,6 +16,11 @@ import { cmdWorkflow } from "./commands/workflow.ts";
 import { cmdBulk } from "./commands/bulk.ts";
 import { cmdAttach } from "./commands/attach.ts";
 import { cmdPrint } from "./commands/print.ts";
+import { cmdAuthLogin, cmdAuthLogout, cmdAuthStatus } from "./commands/auth.ts";
+import { loadToken, isTokenExpired } from "./token-store.ts";
+import { refreshAccessToken } from "./oauth.ts";
+import type { StoredToken } from "./token-store.ts";
+import { saveToken } from "./token-store.ts";
 
 const VERSION = "0.1.0";
 
@@ -30,6 +35,7 @@ function usage(): void {
 USAGE
   frappe-ctl [--site <profile>] <app> <verb> [DocType] [name] [flags]
   frappe-ctl profile <add|use|list|remove> [args]
+  frappe-ctl auth <login|logout|status> [--site <profile>] [--client-id <id>]
 
 APPS
 ${Object.values(APPS).map((a) => `  ${a.alias.padEnd(10)} ${a.name}`).join("\n")}
@@ -83,6 +89,12 @@ PROFILE MANAGEMENT
   frappe-ctl profile use prod
   frappe-ctl profile list
   frappe-ctl profile remove uat
+
+OAUTH (FRAPPE CLOUD)
+  frappe-ctl auth login --client-id <id>       # PKCE flow, opens browser
+  frappe-ctl auth login --site prod --client-id <id>
+  frappe-ctl auth logout
+  frappe-ctl auth status
 `);
 }
 
@@ -168,6 +180,28 @@ async function main(): Promise<void> {
     return;
   }
 
+  // auth sub-command — manages OAuth tokens, no app context needed
+  if (argv[0] === "auth") {
+    const sub = argv[1];
+    const parsed = parseArgs(argv.slice(2));
+    switch (sub) {
+      case "login": {
+        const clientId = parsed.flags["client-id"] ? String(parsed.flags["client-id"]) : undefined;
+        await cmdAuthLogin({ site: parsed.site, clientId });
+        break;
+      }
+      case "logout":
+        await cmdAuthLogout({ site: parsed.site });
+        break;
+      case "status":
+        cmdAuthStatus({ site: parsed.site });
+        break;
+      default:
+        die(`Unknown auth command '${sub ?? ""}'. Valid: login, logout, status\n\nExamples:\n  frappe-ctl auth login --client-id <id>\n  frappe-ctl auth logout\n  frappe-ctl auth status`);
+    }
+    return;
+  }
+
   // profile sub-command — no app/site context needed
   if (argv[0] === "profile") {
     const sub = argv[1];
@@ -238,11 +272,29 @@ async function main(): Promise<void> {
     die((e as Error).message);
   }
 
-  const client = new FrappeClient({
-    url: profile.url,
-    apiKey: profile.api_key,
-    apiSecret: profile.api_secret,
-  });
+  // Auth resolution — OAuth Bearer takes priority over api_key:secret (ADR-009)
+  let activeToken: StoredToken | null = loadToken(profile.url);
+
+  if (activeToken && isTokenExpired(activeToken) && activeToken.refresh_token && profile.client_id) {
+    // Silent token refresh — expired but refresh token available
+    try {
+      const refreshed = await refreshAccessToken(profile.url, profile.client_id, activeToken.refresh_token);
+      activeToken = {
+        access_token: refreshed.access_token,
+        refresh_token: refreshed.refresh_token,
+        expires_at: Date.now() + refreshed.expires_in * 1000,
+        client_id: profile.client_id,
+      };
+      saveToken(profile.url, activeToken);
+    } catch {
+      // Refresh failed (token revoked or server error) — clear and fall back to api_key
+      activeToken = null;
+    }
+  }
+
+  const client = activeToken && !isTokenExpired(activeToken)
+    ? new FrappeClient({ url: profile.url, bearerToken: activeToken.access_token })
+    : new FrappeClient({ url: profile.url, apiKey: profile.api_key, apiSecret: profile.api_secret });
 
   const MUTATION_VERBS = ["create", "patch", "delete", "submit", "cancel", "call", "apply", "workflow", "attach", "bulk"];
   const readonly = process.env["FRAPPE_CTL_READONLY"] === "1";

@@ -27,8 +27,11 @@ export class FrappeRequestError extends Error {
 
 export interface FrappeClientConfig {
   url: string;
-  apiKey: string;
-  apiSecret: string;
+  // Self-hosted: API key auth (ADR-001 — NOT Bearer, NOT Basic)
+  apiKey?: string;
+  apiSecret?: string;
+  // Frappe Cloud OAuth: Bearer token path (ADR-009 — distinct from api_key path)
+  bearerToken?: string;
 }
 
 export class FrappeClient {
@@ -38,8 +41,13 @@ export class FrappeClient {
   constructor(config: FrappeClientConfig) {
     // Strip trailing slash — every endpoint we build starts with /
     this.baseUrl = config.url.replace(/\/$/, "");
-    // Frappe auth: NOT Bearer, NOT Basic — literally "token key:secret"
-    this.authHeader = `token ${config.apiKey}:${config.apiSecret}`;
+    if (config.bearerToken) {
+      // OAuth path — Authorization: Bearer <access_token>
+      this.authHeader = `Bearer ${config.bearerToken}`;
+    } else {
+      // API key path — Authorization: token key:secret (Frappe-specific, NOT standard Bearer)
+      this.authHeader = `token ${config.apiKey ?? ""}:${config.apiSecret ?? ""}`;
+    }
   }
 
   private async request<T>(

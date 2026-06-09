@@ -3,8 +3,9 @@ import { join } from "path";
 
 export interface Profile {
   url: string;
-  api_key: string;
-  api_secret: string;
+  api_key?: string;    // optional when using OAuth (auth_type: "oauth")
+  api_secret?: string; // optional when using OAuth
+  client_id?: string;  // OAuth client ID — stored after first 'auth login --client-id'
   app_versions?: Record<string, string>;  // { "next": "v16", "hr": "v16" } — vX format
 }
 
@@ -103,6 +104,15 @@ export function profileList(): void {
       : "";
     console.log(`${active} ${name.padEnd(16)} ${p.url}${versions}`);
   }
+}
+
+// Persists client_id to an existing profile — called by 'auth login --client-id'
+export function profileUpdateClientId(name: string, clientId: string): void {
+  const cfg = loadConfig();
+  const profile = cfg.profiles[name];
+  if (!profile) throw new Error(`Profile '${name}' not found.`);
+  cfg.profiles[name] = { ...profile, client_id: clientId };
+  saveConfig(cfg);
 }
 
 export function profileRemove(name: string): void {

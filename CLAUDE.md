@@ -82,6 +82,7 @@ src/
   apps.ts             App registry — alias, modules, supportedVersions
   output.ts           Table / CSV formatters
   commands/
+    auth.ts           OAuth login/logout/status (PKCE flow)
     get.ts            list + single fetch
     describe.ts       DocType schema
     apply.ts          create/update from JSON file or stdin
@@ -96,6 +97,8 @@ src/
     report.ts         saved Report runner
     resources.ts      DocType lister per app
     agent-context.ts  machine-readable JSON schema
+  oauth.ts            PKCE helpers: verifier, challenge, exchange, refresh, revoke
+  token-store.ts      Token persistence: macOS Keychain + file fallback (tokens.json 0o600)
   __fixtures__/       Shared mock responses — update when adding fields
 ```
 
@@ -196,12 +199,8 @@ Drawn from gogcli, Trevin's 10 principles, and openclaw integration requirements
 | `FRAPPE_CTL_CONFIG_DIR` | Sandboxed config per agent session |
 | Bounded responses | Default `--limit 20` on `get` |
 
-### Remaining before ERPNext "done done"
-| Item | What to build |
-|------|--------------|
-| **Frappe Cloud auth** | OAuth PKCE for `*.erpnext.com` and `*.frappe.cloud` — keep entirely separate from self-hosted `token key:secret` path. Never conflate. |
-
-Everything else is shipped. `bulk` done ✅.
+### ERPNext Phase 1 — complete ✅
+All items shipped. No remaining Phase 1 items.
 
 ### Phase 2 targets (agent hardening)
 | Principle | What to build |
@@ -255,3 +254,9 @@ Everything else is shipped. `bulk` done ✅.
 | `listAll` pagination boundary | Stops when page returns < 100 docs (PAGE constant). Tests must NOT include an empty-page mock when count < 100 — it gets consumed as the next op's response. |
 | bulk mock count | `bulk patch` on N docs needs N+1 fetch mocks: 1 list call + N PUT calls (assuming N < 100). Add extra list mocks only when testing >100-doc pagination. |
 | bulk result shape | Always outputs `{ total, success, failed, errors[] }` JSON to stdout even on full success. Never throws on per-doc failure — catches and records. |
+| OAuth vs api_key headers | Self-hosted: `Authorization: token key:secret`. OAuth: `Authorization: Bearer <access_token>`. Never mix — see ADR-001 and ADR-009. |
+| OAuth is per-site | No central Frappe Cloud IDP. Each `*.erpnext.com` / `*.frappe.cloud` site runs its own OAuth server. client_id is per-site. |
+| PKCE S256 only | Frappe's `code_challenge_methods_supported` = `["S256"]`. Plain is not listed. Always use S256. |
+| Redirect URI needs explicit port | Register `http://localhost:PORT` not `http://localhost` — Frappe has a known redirect bug with portless `http://localhost` (github.com/frappe/erpnext/issues/15763). |
+| `FRAPPE_CTL_NO_KEYCHAIN=1` | Forces file-only token storage. Required for CI and tests — prevents writing to the real OS keychain. |
+| Silent token refresh | `cli.ts` checks token expiry before building `FrappeClient`. If expired + refresh token available: auto-refreshes silently. If refresh fails: falls back to api_key. |

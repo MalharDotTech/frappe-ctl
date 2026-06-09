@@ -91,6 +91,7 @@ Config lives at `~/.config/frappe-ctl/config.json`. Override location with `FRAP
 | `logs` | Tail Frappe Error Log |
 | `attach` | Upload a file to any doc |
 | `print` | Download doc as PDF via print format |
+| `bulk` | Patch or delete many docs matching a filter |
 
 ---
 
@@ -139,6 +140,12 @@ frappe-ctl next bulk patch SalesOrder --filter "status=Draft" --data '{"status":
 frappe-ctl next bulk patch SalesOrder --filter "status=Draft" --data '{"status":"Cancelled"}'
 frappe-ctl next bulk delete SalesOrder --filter "status=Cancelled" --force
 # → { "total": 12, "success": 11, "failed": 1, "errors": [...] }
+
+# Frappe Cloud OAuth (PKCE — opens browser)
+frappe-ctl auth login --client-id <oauth_client_id>          # first time
+frappe-ctl auth login --site prod --client-id <id>           # specific profile
+frappe-ctl auth status                                        # check token expiry
+frappe-ctl auth logout                                        # revoke + delete token
 
 # Ops + discovery
 frappe-ctl next logs --limit 20
@@ -196,7 +203,7 @@ frappe-ctl profile add uat --url http://localhost:8080 --key k --secret s \
 bun test
 ```
 
-134 tests, colocated with source (`*.test.ts`). Pattern: BDD spec (`frappe-ctl.md`) → TDD (`*.test.ts`) → implementation. HTTP layer mocked via `spyOn(globalThis, "fetch")` — no live server needed.
+168 tests, colocated with source (`*.test.ts`). Pattern: BDD spec (`frappe-ctl.md`) → TDD (`*.test.ts`) → implementation. HTTP layer mocked via `spyOn(globalThis, "fetch")` — no live server needed.
 
 ---
 
@@ -289,7 +296,7 @@ An MCP adapter will wrap `client.ts` as a stdio MCP server, exposing typed tools
 - [x] `--dry-run` on all mutations
 - [x] `FRAPPE_CTL_READONLY=1` — hard-block mutations
 - [x] `agent-context` — machine-readable schema for LLM tool registration
-- [ ] Frappe Cloud auth — OAuth PKCE for `*.erpnext.com` and `*.frappe.cloud`
+- [x] Frappe Cloud auth — OAuth PKCE for `*.erpnext.com` and `*.frappe.cloud`
 
 ---
 
@@ -307,7 +314,7 @@ An MCP adapter will wrap `client.ts` as a stdio MCP server, exposing typed tools
 - [x] `agent-context` — versioned JSON schema for LLM tool discovery
 - [x] `bulk` — filter-scoped patch/delete, paginated (`listAll`), partial-failure tolerant
 - [x] Error enumeration — unknown verb lists all valid verbs
-- [ ] Frappe Cloud auth — OAuth PKCE for `*.erpnext.com` and `*.frappe.cloud`
+- [x] Frappe Cloud auth — OAuth PKCE for `*.erpnext.com` and `*.frappe.cloud`
 
 ### Phase 2 — Agent-native hardening
 - [ ] MCP adapter — `mcp/index.ts` stdio server wrapping `client.ts`, read-only by default
