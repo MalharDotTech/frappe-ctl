@@ -85,6 +85,21 @@ When `--field` is not specified, `search` calls `getDocTypeMeta` first to determ
 ### `validate` uses `process.exit(1)`, not `die()`
 `validate` exits 1 on missing/unknown fields because it's a validation result, not a fatal error. `die()` is reserved for CLI usage errors and infrastructure failures. Don't change this — operator agents use the exit code to branch without parsing stderr.
 
+### `validate --output json` writes to stdout, exit code unchanged
+`--output json` produces `{valid, required, missing, unknown}` on stdout regardless of pass/fail. Exit code is still 0 on valid, 1 on invalid. Stdout is NOT empty on exit 1 when `--output json` is set — callers must not assume stdout is empty on failure.
+
+### `--enable-verbs` gate placement
+`--enable-verbs` is checked after the READONLY check, before the verb router. `isVerbAllowed()` is exported as a pure function for unit testing without mocking the CLI. An empty string blocks all verbs — this is intentional and correct.
+
+### `--wait` only on `call` verb
+`--wait` detects `job_name` (string) in the `callMethod` response. If present, calls `client.waitForJob(jobName)`. On `failed` status, `call.ts` throws (not `waitForJob` itself — it returns the info object). On `finished`, outputs `info.result`. `--wait` on a synchronous method that returns no `job_name` is a silent no-op.
+
+### `waitForJob` opts pattern for tests
+`client.waitForJob(jobName, { intervalMs: 0, timeoutMs: N })` — pass `intervalMs: 0` in tests to skip sleep delays. Never hard-code 2000ms poll interval in tests.
+
+### MCP tool scope is bounded
+`mcp-server.ts` exposes 5 read-only tools + 3 mutation tools. Tool names are `frappe_*` snake_case. Validation logic in `frappe_validate` is inlined in `mcp-server.ts` — not shared with `validate.ts`. Commands stay thin (call client + format); MCP tools follow the same rule. Never expose a generic `frappe_call` MCP tool — typed tools only.
+
 ---
 
 ## File Layout
@@ -92,10 +107,11 @@ When `--field` is not specified, `search` calls `getDocTypeMeta` first to determ
 ```
 src/
   cli.ts              Entry + arg parser (no external deps)
-  client.ts           All HTTP — getDoc, listDocs, countDocs, searchDocs, callMethod, uploadFile, downloadPdf
+  client.ts           All HTTP — getDoc, listDocs, countDocs, searchDocs, callMethod, waitForJob, uploadFile, downloadPdf
   config.ts           Profile CRUD — functions not constants
   apps.ts             App registry — alias, modules, supportedVersions, KEY_FIELDS
   output.ts           Table / CSV / sparse formatters — sparseDoc, stripMetaDoc, applyOutputFilters
+  mcp-server.ts       MCP stdio server — 5 read-only + 3 mutation tools, JSON-RPC 2.0, --allow-mutations gate
   commands/
     auth.ts           OAuth login/logout/status (PKCE flow)
     get.ts            list + single fetch (--sparse, --strip-meta)
@@ -103,7 +119,7 @@ src/
     search.ts         text search by title_field (auto-detect from meta or --field)
     describe.ts       DocType schema (--required, --compact, --names-only, --relationships)
     link.ts           follow Link field, return linked doc
-    validate.ts       pre-flight required field check — Levenshtein typo suggestions, exit 1 on fail
+    validate.ts       pre-flight required field check — Levenshtein typo suggestions, exit 1 on fail, --output json
     diff.ts           show field delta before patching (read-only)
     apply.ts          create/update from JSON file or stdin (--sparse, --strip-meta)
     write.ts          create, patch, delete (--sparse, --strip-meta on create/patch)
@@ -113,7 +129,7 @@ src/
     print.ts          binary PDF download
     logs.ts           Frappe Error Log tail (--since, --compact)
     bulk.ts           filter-scoped patch/delete with listAll pagination
-    call.ts           raw whitelisted method call
+    call.ts           raw whitelisted method call (--wait for async job polling)
     report.ts         saved Report runner (--sparse)
     resources.ts      DocType lister per app (--compact, --submittable)
     agent-context.ts  static CLI schema + DocType-scoped compact schema (--doctypes, --include-counts)
@@ -136,11 +152,13 @@ bun test src/commands/get.test.ts   # single file
 - Tests colocated with source (`commands/get.ts` → `commands/get.test.ts`)
 - Mock HTTP: `spyOn(globalThis, "fetch").mockResolvedValueOnce(...)`
 - **Never re-spy on fetch inside a test to count calls** — use the spy returned from the initial `spyOn(...)` call. Re-spying creates a fresh spy that reports stale call counts from the underlying mock.
+- **Spy on client methods (e.g. `waitForJob`) with `mockRestore()` after each test that creates one** — unrestored method spies accumulate call counts across tests. Call `mockRestore()` AFTER assertions, not before.
 - Config isolation: set `process.env.FRAPPE_CTL_CONFIG_DIR` to a temp dir in `beforeEach`, restore in `afterEach`
 - Fixtures in `src/__fixtures__/api-responses.ts` — add shapes there, not inline in tests
 - Fixture format for `callMethod` responses: `{ message: <payload> }` (not `{ data: ... }`)
 - Fixture format for `listDocs` / `getDoc` responses: `{ data: <payload> }`
 - For verbs that make multiple sequential HTTP calls (e.g. `link`: getDoc + getDocTypeMeta + getDoc), chain `mockResolvedValueOnce` on the same spy — do not call `spyOn` multiple times
+- `waitForJob` tests: pass `{ intervalMs: 0 }` to skip sleep. Use `mockResolvedValue` (not `Once`) for the timeout test — it needs to be called many times before timeout triggers.
 
 Target: every new verb gets its own `*.test.ts` with at minimum: happy path, filter/flag behaviour, output format (table + json).
 
@@ -176,7 +194,7 @@ title: ""
 date: YYYY-MM-DD
 status: accepted          # proposed | accepted | deprecated | superseded-by:NNN
 frappe_version: "v16"
-frappe_ctl_version: "0.1.0"   # match package.json at time of decision
+frappe_ctl_version: "0.2.0"   # match package.json at time of decision
 tags: []                  # e.g. [auth, http, frappe-quirk, safety]
 ---
 ```
@@ -228,23 +246,29 @@ Drawn from gogcli, Trevin's 10 principles, and openclaw integration requirements
 | Token efficiency | `--sparse` strips null/empty/zero (~55% reduction); `--strip-meta` removes system fields |
 | Pre-flight ops | `validate` (required fields), `diff` (delta preview) — both read-only, no write attempt needed |
 | Cardinality without fetch | `count` returns single integer — never fetch 20 docs to know there are 3 |
+| Structured validation output | `validate --output json` → `{valid, required, missing, unknown}` on stdout |
+| Surface-area limiting | `--enable-verbs get,describe` restricts verb set for sandboxed sessions |
+| Async job completion | `call --wait` polls `waitForJob` until `finished`/`failed` |
+| MCP stdio server | `frappe-ctl mcp` — 5 read-only tools; `--allow-mutations` adds 3 write tools |
 
-### Phase 2 targets (agent hardening)
+### Phase 3 targets
 | Principle | What to build |
 |-----------|--------------|
-| MCP adapter | `mcp/index.ts` stdio server — typed tools, read-only by default, mutations behind opt-in |
-| `--wait` on async jobs | Block until Frappe background job completes. ERPNext bulk ops are async. |
-| Command allowlisting | `--enable-verbs get,describe` — restrict surface for sandboxed agent invocations |
-| `validate --output json` | Structured `{"valid":false,"missing":[...]}` to stdout — exit code alone is enough for most use, but JSON output enables richer agent branching |
+| Shell completions | bash/zsh/fish completions for verbs + DocType names |
+| Binary releases | `bun build --compile` via GitHub Actions |
+| `--wait` timeout config | `--wait-timeout <seconds>` for heavy jobs (stock reconciliation, period close) |
+| `jobs` verb | List/cancel Frappe background jobs |
 
 ### Don'ts for dev agents (building/modifying frappe-ctl)
 - **Never expose generic shell execution** in MCP — expose typed tools, not `bash(cmd)`
+- **Never expose `frappe_call` as an MCP tool** — too broad, no type safety, no audit trail. Only typed tools.
 - **Never auto-paginate silently** — truncate with a message, let the agent decide to fetch more
 - **Don't wrap free-text Frappe fields as structured data** — mark them as untrusted prose for LLM consumption
 - **Don't mix auth flows** — self-hosted uses `token key:secret`, Frappe Cloud uses OAuth. Keep these separate code paths, never conflate.
 - **Don't add `--sparse` / `--strip-meta` to write verbs that show dry-run previews** — dry-run output should show full data so the agent can verify what it's about to write
 - **Don't cache DocType meta** — adds complexity, meta calls are fast, caching causes stale schema bugs
 - **Don't add `process.exit` to new verbs** — only `validate.ts` exits with non-zero for validation results; all other exits go through `die()` in `main().catch`
+- **Don't share validation logic between `validate.ts` and `mcp-server.ts`** — each stays thin, inlines what it needs from `client.*`
 
 ---
 
@@ -284,7 +308,8 @@ frappe-ctl next agent-context \
 ### Output parsing
 - JSON is default when piped. Parse stdout as JSON directly.
 - `count` outputs a plain integer string — `parseInt(stdout.trim())`.
-- `validate` writes MISSING/UNKNOWN to **stderr**, exits 1. Stdout is empty on failure.
+- `validate` (default): writes MISSING/UNKNOWN to **stderr**, exits 1. Stdout empty on failure.
+- `validate --output json`: writes `{valid, required, missing, unknown}` to **stdout** on both pass AND fail. Exit code still 0/1.
 - `bulk` always outputs `{ total, success, failed, errors[] }` JSON to stdout — even on full success.
 - `diff` always outputs to stdout as a text table — no JSON mode currently.
 - Errors go to stderr. Data goes to stdout. Never mix them.
@@ -298,17 +323,24 @@ frappe-ctl next count "Sales Order" --filter "project=PROJ-0005"
 # Pattern: follow the graph
 frappe-ctl next link "Sales Order" SAL-ORD-001 project --sparse
 
-# Pattern: pre-flight before create
-frappe-ctl next validate "Purchase Order" --data '{"supplier":"Acme","items":[...]}'
-# exit 0 → proceed; exit 1 → fix payload
+# Pattern: pre-flight before create (structured output for agent branching)
+frappe-ctl next validate "Purchase Order" --data '{"supplier":"Acme","items":[...]}' --output json
+# exit 0 → proceed; exit 1 + stdout has {valid:false,missing:[...]} → fix payload
 
 # Pattern: preview before patch
 frappe-ctl next diff Project PROJ-001 --data '{"status":"Completed","custom_sanction_amount":18000}'
+
+# Pattern: async job (ERPNext bulk stock ops, period close, etc.)
+frappe-ctl next call erpnext.stock.utils.make_stock_entry --data '{...}' --wait
+# blocks until job finished, outputs result; exits 1 if job failed
 
 # Pattern: bulk with confirmation
 frappe-ctl next bulk patch "Sales Order" --filter "status=Draft" --data '{"status":"Cancelled"}' --dry-run
 # → review list of affected docs
 frappe-ctl next bulk patch "Sales Order" --filter "status=Draft" --data '{"status":"Cancelled"}'
+
+# Pattern: sandboxed read-only session
+frappe-ctl --enable-verbs get,count,search,describe next get Customer --sparse
 ```
 
 ---
@@ -325,6 +357,7 @@ frappe-ctl next bulk patch "Sales Order" --filter "status=Draft" --data '{"statu
 | `updateDoc(doctype, name, data)` | PUT `/api/resource/{doctype}/{name}` | Returns `res.data` |
 | `deleteDoc(doctype, name)` | DELETE `/api/resource/{doctype}/{name}` | Returns void |
 | `callMethod(method, data?)` | POST `/api/method/{method}` | Returns `res.message` |
+| `waitForJob(jobName, opts?)` | POST `frappe.utils.background_jobs.get_info` (loop) | Polls until `finished`/`failed`/`not_found`. Default: 2000ms interval, 60s timeout. Pass `{intervalMs:0}` in tests. |
 | `submitDoc(doctype, name)` | POST `frappe.client.submit` | Returns `res.message` |
 | `cancelDoc(doctype, name)` | POST `frappe.client.cancel` | Returns `res.message` |
 | `getDocTypeMeta(doctype)` | POST `frappe.client.get` on DocType | Returns `res.message` |
@@ -370,3 +403,4 @@ frappe-ctl next bulk patch "Sales Order" --filter "status=Draft" --data '{"statu
 | Silent token refresh | `cli.ts` checks token expiry before building `FrappeClient`. If expired + refresh token available: auto-refreshes silently. If refresh fails: falls back to api_key. |
 | `describe --required` JSON output | JSON path uses `{ ...meta, fields }` where `fields` is already filtered. Never output raw `meta` in the catch-all JSON case — it bypasses all filter flags. |
 | `title_field` on DocType meta | Present on the top-level DocType object (not in the `fields` array). Used by `search` to determine which field to search. Absent on many DocTypes — fall back to `TITLE_FIELD_FALLBACKS` list in `search.ts`. |
+| `frappe.utils.background_jobs.get_info` param | Takes `{job_id: jobName}`. Terminal states: `finished`, `failed`, `not_found`. Non-terminal: `queued`, `started`, `deferred`. Parameter name may differ across Frappe versions — verify if get_info never returns terminal on a live site. |

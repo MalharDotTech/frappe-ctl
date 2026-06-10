@@ -308,6 +308,25 @@ export class FrappeClient {
     });
   }
 
+  async waitForJob(
+    jobName: string,
+    opts: { intervalMs?: number; timeoutMs?: number } = {},
+  ): Promise<{ status: string; result?: unknown; exc_info?: string }> {
+    const interval = opts.intervalMs ?? 2000;
+    const timeout = opts.timeoutMs ?? 60000;
+    const start = Date.now();
+    while (Date.now() - start < timeout) {
+      const info = await this.callMethod<{ status: string; result?: unknown; exc_info?: string }>(
+        "frappe.utils.background_jobs.get_info",
+        { job_id: jobName },
+      );
+      const { status } = info;
+      if (status === "finished" || status === "failed" || status === "not_found") return info;
+      await new Promise<void>((resolve) => setTimeout(resolve, interval));
+    }
+    throw new Error(`Job '${jobName}' timed out after ${timeout / 1000}s`);
+  }
+
   async listDocTypes(modules?: string[]): Promise<Record<string, unknown>[]> {
     // Use POST method (frappe.client.get_list) instead of GET /api/resource
     // to avoid URL length limits when filtering by many modules

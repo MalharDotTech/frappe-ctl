@@ -22,12 +22,13 @@ import { cmdLink } from "./commands/link.ts";
 import { cmdValidate } from "./commands/validate.ts";
 import { cmdDiff } from "./commands/diff.ts";
 import { cmdAuthLogin, cmdAuthLogout, cmdAuthStatus } from "./commands/auth.ts";
+import { runMcpServer } from "./mcp-server.ts";
 import { loadToken, isTokenExpired } from "./token-store.ts";
 import { refreshAccessToken } from "./oauth.ts";
 import type { StoredToken } from "./token-store.ts";
 import { saveToken } from "./token-store.ts";
 
-const VERSION = "0.1.0";
+const VERSION = "0.2.0";
 
 export function isVerbAllowed(verb: string, enableVerbs: string | undefined): boolean {
   if (enableVerbs === undefined) return true;
@@ -83,6 +84,7 @@ FLAGS
   --data '{"field":"value"}'    JSON payload (create/patch/validate/diff)
   --force                       Skip confirmation (delete)
   --dry-run                     Show what would happen, no writes
+  --wait                        Block until background job completes (call verb only)
   --sparse                      Strip null/empty/zero fields from output
   --strip-meta                  Remove Frappe system fields (owner, creation, etc)
   -o, --output json|table|csv   Output format
@@ -124,6 +126,11 @@ OAUTH (FRAPPE CLOUD)
   frappe-ctl auth login --site prod --client-id <id> --port 8756
   frappe-ctl auth logout
   frappe-ctl auth status
+
+MCP SERVER (STDIO)
+  frappe-ctl mcp                                     # Read-only tools (frappe_get/count/search/describe/validate)
+  frappe-ctl mcp --allow-mutations                   # Also exposes frappe_create/patch/delete
+  frappe-ctl mcp --site prod                         # Use specific profile
 `);
 }
 
@@ -205,6 +212,19 @@ async function main(): Promise<void> {
 
   if (argv[0] === "--version" || argv[0] === "-v") {
     console.log(VERSION);
+    return;
+  }
+
+  // mcp — start stdio MCP server using active profile
+  if (argv[0] === "mcp") {
+    const parsed = parseArgs(argv.slice(1));
+    const allowMutations = parsed.flags["allow-mutations"] === true;
+    const cfg = loadConfig();
+    let profile;
+    try { profile = getActiveProfile(cfg, parsed.site); }
+    catch (e) { die((e as Error).message); }
+    const mcpClient = new FrappeClient({ url: profile.url, apiKey: profile.api_key, apiSecret: profile.api_secret });
+    await runMcpServer(mcpClient, { allowMutations });
     return;
   }
 
@@ -481,7 +501,8 @@ async function main(): Promise<void> {
         try { data = JSON.parse(String(raw)) as Record<string, unknown>; }
         catch { die("--data must be valid JSON"); }
       }
-      await cmdCall(client, { method, data, format: fmt });
+      const wait = args.flags["wait"] === true;
+      await cmdCall(client, { method, data, format: fmt, wait });
       break;
     }
 

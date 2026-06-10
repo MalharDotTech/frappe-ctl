@@ -12,13 +12,18 @@ The `app` alias scopes every command to the right module namespace. Humans and a
 
 ## Why
 
-Frappe's REST API is powerful but raw. Every integration ends up reimplementing auth, filter syntax, output formatting, and profile management. `frappe-ctl` solves that once — then gets out of the way.
+This started as a personal tool. A client and friend was getting onboarded onto ERPNext — a powerful system, but one with a steep learning curve. Explaining it through the UI felt slow. What actually worked was letting them describe what they wanted in plain language and having an AI agent translate that into precise API operations against their live site.
+
+That required a clean, agent-friendly interface to ERPNext. Frappe's REST API is powerful but raw — every integration reimplements auth, filter syntax, output formatting, and profile management. `frappe-ctl` solves that once and exposes it through a grammar both humans and agents can reason about reliably.
+
+The result is a tool built around one idea: **talking to ERPNext through AI should be as natural as talking to a colleague who knows the system.**
 
 Design goals:
-- **Agent-native** — JSON stdout by default when not a TTY, pipe-safe, token-efficient
-- **Deterministic grammar** — `app verb DocType [name]`, inspired by `kubectl`
-- **No dependencies** — pure Bun/TypeScript, no Axios, no CLI frameworks
-- **Multi-site** — named profiles, one config file, `--site` override anywhere
+- **Agent-native** — JSON stdout by default when piped, token-efficient output filters, pre-flight ops before writes
+- **Deterministic grammar** — `app verb DocType [name]`, inspired by `kubectl` — LLMs route to the right verb consistently
+- **No dependencies** — pure Bun/TypeScript, zero external packages, fast startup
+- **Multi-site** — named profiles, `--site` override, sandboxed config via `FRAPPE_CTL_CONFIG_DIR`
+- **MCP-ready** — `frappe-ctl mcp` starts a stdio server exposing typed tools for Claude, Cursor, and any MCP host
 
 ---
 
@@ -346,8 +351,26 @@ frappe-ctl next agent-context \
 # → < 4KB JSON with required_fields, key_fields, record_count per DocType
 ```
 
-### MCP (coming)
-An MCP adapter will wrap `client.ts` as a stdio MCP server, exposing typed tools (`get_doc`, `list_docs`, `create_doc`, etc.) consumable directly by Claude, Cursor, and any MCP-compatible host. Read-only by default; mutations require explicit opt-in.
+### MCP server
+
+`frappe-ctl mcp` starts a JSON-RPC 2.0 stdio server consumable by Claude, Cursor, and any MCP-compatible host.
+
+```bash
+frappe-ctl mcp                     # read-only (5 tools)
+frappe-ctl mcp --allow-mutations   # adds create/patch/delete (8 tools total)
+frappe-ctl mcp --site prod         # use specific profile
+```
+
+| Tool | What it does |
+|------|-------------|
+| `frappe_get` | Single doc or list with filters + sparse |
+| `frappe_count` | Count matching docs — plain integer |
+| `frappe_search` | Text search by title field |
+| `frappe_describe` | DocType schema (supports `required`, `relationships`) |
+| `frappe_validate` | Pre-flight check — returns `{valid, missing, unknown}` |
+| `frappe_create` | Create doc (`--allow-mutations` only) |
+| `frappe_patch` | Update fields (`--allow-mutations` only) |
+| `frappe_delete` | Delete doc, requires `force:true` (`--allow-mutations` only) |
 
 ---
 
@@ -405,17 +428,17 @@ An MCP adapter will wrap `client.ts` as a stdio MCP server, exposing typed tools
 - [x] `resources --compact / --submittable` — DocType list modes
 - [x] `KEY_FIELDS` registry in `apps.ts` — key fields per DocType for agent context
 
-### Phase 2 — Agent-native hardening
+### Phase 2 — Agent-native hardening ✅
 
-- [ ] MCP adapter — `mcp/index.ts` stdio server wrapping `client.ts`, read-only by default
-- [ ] `--wait` flag — block until Frappe background job completes
-- [ ] `jobs` command — list/get/cancel Frappe background jobs
-- [ ] Command allowlisting — `--enable-verbs get,describe` for sandboxed agent invocations
-- [ ] `validate --output json` — structured `{"valid":false,"missing":[...]}` for agent pipelines
+- [x] MCP stdio server — 5 read-only tools + 3 mutation tools behind `--allow-mutations`
+- [x] `call --wait` — block until Frappe background job completes (`frappe.utils.background_jobs.get_info`)
+- [x] `--enable-verbs get,describe` — hard surface-area limit for sandboxed agent invocations
+- [x] `validate --output json` — structured `{valid, required, missing, unknown}` on stdout for agent branching
 
 ### Phase 3 — Distribution
 
 - [ ] Shell completions (bash/zsh/fish)
 - [ ] Compiled binary releases via GitHub Actions (`bun build --compile`)
-- [ ] `frappe-ctl next watch` — poll and stream doc changes
+- [ ] `--wait-timeout <seconds>` — configurable timeout for heavy async jobs
+- [ ] `jobs` verb — list/cancel Frappe background jobs
 - [ ] Homebrew tap

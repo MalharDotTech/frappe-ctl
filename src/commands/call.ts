@@ -4,10 +4,24 @@ interface CallArgs {
   method: string;
   data?: Record<string, unknown>;
   format?: string;
+  wait?: boolean;
 }
 
 export async function cmdCall(client: FrappeClient, args: CallArgs): Promise<void> {
   const result = await client.callMethod<unknown>(args.method, args.data);
+
+  if (args.wait && result && typeof result === "object" && !Array.isArray(result)) {
+    const jobName = (result as Record<string, unknown>)["job_name"];
+    if (typeof jobName === "string") {
+      console.error(`Waiting for job ${jobName}...`);
+      const info = await client.waitForJob(jobName);
+      if (info.status === "failed") {
+        throw new Error(`Job failed: ${info.exc_info ?? "unknown error"}`);
+      }
+      process.stdout.write(JSON.stringify(info.result ?? null, null, 2) + "\n");
+      return;
+    }
+  }
 
   const fmt = args.format ?? (process.stdout.isTTY ? "table" : "json");
 

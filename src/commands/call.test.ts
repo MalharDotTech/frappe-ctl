@@ -73,4 +73,51 @@ describe("cmdCall", () => {
     const [url] = spy.mock.calls[0] as [string];
     expect(url).toContain(method);
   });
+
+  it("--wait polls job and outputs final result when response has job_name", async () => {
+    mockFetch({ message: { job_name: "job-abc", status: "queued" } });
+    const waitSpy = spyOn(client, "waitForJob").mockResolvedValueOnce({
+      status: "finished",
+      result: { name: "STOCK-0001" },
+    });
+    const { lines, restore } = captureOutput();
+    spyOn(console, "error").mockImplementation(() => {});
+
+    await cmdCall(client, { method: "some.async.method", format: "json", wait: true });
+    restore();
+
+    expect(waitSpy).toHaveBeenCalledWith("job-abc");
+    const out = JSON.parse(lines[0]!) as Record<string, unknown>;
+    expect(out["name"]).toBe("STOCK-0001");
+    waitSpy.mockRestore();
+  });
+
+  it("--wait throws when job fails", async () => {
+    mockFetch({ message: { job_name: "job-fail", status: "queued" } });
+    const waitSpy = spyOn(client, "waitForJob").mockResolvedValueOnce({
+      status: "failed",
+      exc_info: "ValueError: bad data",
+    });
+    spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      await cmdCall(client, { method: "some.async.method", format: "json", wait: true });
+      throw new Error("should have thrown");
+    } catch (e) {
+      expect((e as Error).message).toContain("Job failed");
+    } finally {
+      waitSpy.mockRestore();
+    }
+  });
+
+  it("--wait ignored when response has no job_name — only 1 fetch call made", async () => {
+    const fetchSpy = mockFetch({ message: { some: "data" } });
+    const { lines, restore } = captureOutput();
+
+    await cmdCall(client, { method: "some.sync.method", format: "json", wait: true });
+    restore();
+
+    expect(fetchSpy.mock.calls.length).toBe(1);
+    expect(lines[0]).toContain("some");
+  });
 });

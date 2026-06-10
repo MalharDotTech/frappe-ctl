@@ -190,3 +190,56 @@ describe("FrappeClient — error handling", () => {
     }
   });
 });
+
+describe("FrappeClient.waitForJob", () => {
+  afterEach(() => spyOn(globalThis, "fetch").mockRestore());
+
+  it("polls until finished and returns result", async () => {
+    const spy = spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(JSON.stringify({ message: { status: "started" } }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ message: { status: "finished", result: { ok: true } } }), { status: 200 }));
+
+    const client = makeClient();
+    const info = await client.waitForJob("job-123", { intervalMs: 0 });
+
+    expect(info.status).toBe("finished");
+    expect((info.result as Record<string, unknown>)?.ok).toBe(true);
+    expect(spy.mock.calls.length).toBe(2);
+  });
+
+  it("returns immediately when already finished", async () => {
+    const spy = spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(JSON.stringify({ message: { status: "finished", result: "done" } }), { status: 200 }));
+
+    const client = makeClient();
+    const info = await client.waitForJob("job-456", { intervalMs: 0 });
+
+    expect(info.status).toBe("finished");
+    expect(spy.mock.calls.length).toBe(1);
+  });
+
+  it("returns failed status without throwing", async () => {
+    spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(JSON.stringify({ message: { status: "failed", exc_info: "ValueError" } }), { status: 200 }));
+
+    const client = makeClient();
+    const info = await client.waitForJob("job-789", { intervalMs: 0 });
+
+    expect(info.status).toBe("failed");
+    expect(info.exc_info).toBe("ValueError");
+  });
+
+  it("throws on timeout", async () => {
+    spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ message: { status: "started" } }), { status: 200 }),
+    );
+
+    const client = makeClient();
+    try {
+      await client.waitForJob("job-slow", { intervalMs: 0, timeoutMs: 1 });
+      throw new Error("should have thrown");
+    } catch (e) {
+      expect((e as Error).message).toContain("timed out");
+    }
+  });
+});
