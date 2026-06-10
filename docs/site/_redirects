@@ -1,1 +1,2 @@
-/quickstart  /quickstart.html  301
+# Cloudflare Pages handles .html pretty URLs automatically.
+# No custom redirects needed.
