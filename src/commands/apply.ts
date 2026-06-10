@@ -1,15 +1,16 @@
 import { readFileSync } from "fs";
 import { FrappeClient } from "../client.ts";
-import { detectFormat, printDoc } from "../output.ts";
+import { detectFormat, printDoc, type OutputFilterOpts } from "../output.ts";
 
 interface ApplyArgs {
   file: string;       // path to JSON file, or "-" for stdin
   format?: string;
   dryRun?: boolean;
+  sparse?: boolean;
+  stripMeta?: boolean;
 }
 
 export async function cmdApply(client: FrappeClient, args: ApplyArgs): Promise<void> {
-  // Read source — file path or stdin
   let raw: string;
   if (args.file === "-") {
     const chunks: Buffer[] = [];
@@ -45,5 +46,6 @@ export async function cmdApply(client: FrappeClient, args: ApplyArgs): Promise<v
     ? await client.updateDoc(doctype, name as string, doc)
     : await client.createDoc(doctype, doc);
 
-  printDoc(result, detectFormat(args.format));
+  const opts: OutputFilterOpts = { sparse: args.sparse, stripMeta: args.stripMeta };
+  printDoc(result, detectFormat(args.format), opts);
 }

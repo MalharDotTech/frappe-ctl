@@ -91,6 +91,22 @@ export const APPS: Record<string, AppDef> = {
   },
 };
 
+// Key fields per DocType — used by agent-context --compact and search defaults.
+// These are the fields an agent typically needs for each DocType beyond required fields.
+export const KEY_FIELDS: Record<string, string[]> = {
+  "Sales Order":      ["customer", "status", "grand_total", "per_billed", "per_delivered", "project", "transaction_date"],
+  "Purchase Order":   ["supplier", "status", "grand_total", "project", "transaction_date"],
+  "Sales Invoice":    ["customer", "status", "grand_total", "outstanding_amount", "project", "posting_date"],
+  "Purchase Invoice": ["supplier", "status", "grand_total", "outstanding_amount", "project", "posting_date"],
+  "Payment Entry":    ["payment_type", "party_type", "party", "paid_amount", "posting_date"],
+  "Project":          ["project_name", "status", "customer", "gross_margin", "per_gross_margin"],
+  "Customer":         ["customer_name", "customer_type", "customer_group", "mobile_no", "email_id"],
+  "Supplier":         ["supplier_name", "supplier_type", "supplier_group", "mobile_no", "email_id"],
+  "Item":             ["item_name", "item_group", "uom", "standard_rate"],
+  "Employee":         ["employee_name", "designation", "department", "status"],
+  "Leave Application": ["employee", "leave_type", "status", "from_date", "to_date"],
+};
+
 export function resolveApp(alias: string): AppDef {
   const app = APPS[alias];
   if (!app) {

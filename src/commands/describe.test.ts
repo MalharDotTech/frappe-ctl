@@ -65,4 +65,33 @@ describe("cmdDescribe", () => {
     const deliveryLine = output.split("\n").find((l) => l.includes("delivery_date"));
     expect(deliveryLine).toContain("no");
   });
+
+  it("--required in JSON mode returns only reqd fields, not all fields", async () => {
+    mockFetch({ message: doctypeMetaResponse });
+    const { lines, restore } = captureOutput();
+
+    await cmdDescribe(client, { doctype: "Sales Order", format: "json", required: true });
+    restore();
+
+    // doctypeMetaResponse has 2 reqd fields: customer and transaction_date
+    const output = JSON.parse(lines[0]!) as { fields: { fieldname: string; reqd: number }[] };
+    expect(output.fields.every((f) => f.reqd === 1)).toBe(true);
+    expect(output.fields.length).toBe(2);
+    expect(output.fields.map((f) => f.fieldname)).toContain("customer");
+    expect(output.fields.map((f) => f.fieldname)).toContain("transaction_date");
+  });
+
+  it("--relationships in JSON mode returns only Link/Table fields", async () => {
+    mockFetch({ message: doctypeMetaResponse });
+    const { lines, restore } = captureOutput();
+
+    await cmdDescribe(client, { doctype: "Sales Order", format: "json", relationships: true });
+    restore();
+
+    // doctypeMetaResponse has 1 Link field: customer
+    const output = JSON.parse(lines[0]!) as { fieldname: string; fieldtype: string }[];
+    expect(Array.isArray(output)).toBe(true);
+    expect(output.every((f) => f.fieldtype === "Link" || f.fieldtype === "Table" || f.fieldtype === "Table MultiSelect")).toBe(true);
+    expect(output.map((f) => f.fieldname)).toContain("customer");
+  });
 });

@@ -50,7 +50,12 @@ describe("cmdAgentContext", () => {
     expect(verbNames).toContain("report");
     expect(verbNames).toContain("resources");
     expect(verbNames).toContain("logs");
-    expect(parsed.verbs.length).toBe(16);
+    expect(verbNames).toContain("count");
+    expect(verbNames).toContain("search");
+    expect(verbNames).toContain("link");
+    expect(verbNames).toContain("validate");
+    expect(verbNames).toContain("diff");
+    expect(parsed.verbs.length).toBe(21);
   });
 
   it("workflow verb is not readonly_safe", async () => {

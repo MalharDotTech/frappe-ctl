@@ -296,6 +296,18 @@ export class FrappeClient {
     return new Uint8Array(await res.arrayBuffer());
   }
 
+  async searchDocs(
+    doctype: string,
+    query: string,
+    searchField: string,
+    opts: ListOptions = {},
+  ): Promise<Record<string, unknown>[]> {
+    return this.listDocs(doctype, {
+      ...opts,
+      filters: [[searchField, "like", `%${query}%`], ...(opts.filters ?? [])],
+    });
+  }
+
   async listDocTypes(modules?: string[]): Promise<Record<string, unknown>[]> {
     // Use POST method (frappe.client.get_list) instead of GET /api/resource
     // to avoid URL length limits when filtering by many modules

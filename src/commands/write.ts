@@ -1,11 +1,13 @@
 import { FrappeClient } from "../client.ts";
-import { detectFormat, printDoc } from "../output.ts";
+import { detectFormat, printDoc, type OutputFilterOpts } from "../output.ts";
 
 interface CreateArgs {
   doctype: string;
   data: Record<string, unknown>;
   format?: string;
   dryRun?: boolean;
+  sparse?: boolean;
+  stripMeta?: boolean;
 }
 
 interface PatchArgs {
@@ -14,6 +16,8 @@ interface PatchArgs {
   data: Record<string, unknown>;
   format?: string;
   dryRun?: boolean;
+  sparse?: boolean;
+  stripMeta?: boolean;
 }
 
 interface DeleteArgs {
@@ -30,7 +34,8 @@ export async function cmdCreate(client: FrappeClient, args: CreateArgs): Promise
     return;
   }
   const doc = await client.createDoc(args.doctype, args.data);
-  printDoc(doc, detectFormat(args.format));
+  const opts: OutputFilterOpts = { sparse: args.sparse, stripMeta: args.stripMeta };
+  printDoc(doc, detectFormat(args.format), opts);
 }
 
 export async function cmdPatch(client: FrappeClient, args: PatchArgs): Promise<void> {
@@ -40,7 +45,8 @@ export async function cmdPatch(client: FrappeClient, args: PatchArgs): Promise<v
     return;
   }
   const doc = await client.updateDoc(args.doctype, args.name, args.data);
-  printDoc(doc, detectFormat(args.format));
+  const opts: OutputFilterOpts = { sparse: args.sparse, stripMeta: args.stripMeta };
+  printDoc(doc, detectFormat(args.format), opts);
 }
 
 export async function cmdDelete(client: FrappeClient, args: DeleteArgs): Promise<void> {

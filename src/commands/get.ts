@@ -1,5 +1,5 @@
 import { FrappeClient, type FrappeFilter } from "../client.ts";
-import { detectFormat, printDoc, printDocs } from "../output.ts";
+import { detectFormat, printDoc, printDocs, type OutputFilterOpts } from "../output.ts";
 
 interface GetArgs {
   doctype: string;
@@ -8,21 +8,24 @@ interface GetArgs {
   fields?: string[];
   limit: number;
   format?: string;
+  sparse?: boolean;
+  stripMeta?: boolean;
 }
 
 export async function cmdGet(client: FrappeClient, args: GetArgs): Promise<void> {
   const fmt = detectFormat(args.format);
+  const opts: OutputFilterOpts = { sparse: args.sparse, stripMeta: args.stripMeta };
 
   if (args.name) {
     const doc = await client.getDoc(args.doctype, args.name);
-    printDoc(doc, fmt);
+    printDoc(doc, fmt, opts);
   } else {
     const docs = await client.listDocs(args.doctype, {
       filters: args.filters,
       fields: args.fields,
       limit: args.limit,
     });
-    printDocs(docs, fmt);
+    printDocs(docs, fmt, opts);
   }
 }
 

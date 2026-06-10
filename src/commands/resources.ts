@@ -4,12 +4,28 @@ import { resolveApp } from "../apps.ts";
 interface ResourcesArgs {
   appAlias: string;
   format?: string;
+  compact?: boolean;      // --compact: return name array only
+  submittable?: boolean;  // --submittable: filter to is_submittable=1 only
 }
 
 export async function cmdResources(client: FrappeClient, args: ResourcesArgs): Promise<void> {
   const app = resolveApp(args.appAlias);
-  const docs = await client.listDocTypes(app.modules);
+  let docs = await client.listDocTypes(app.modules);
   const fmt = args.format ?? (process.stdout.isTTY ? "table" : "json");
+
+  if (args.submittable) {
+    docs = docs.filter((d) => d["is_submittable"]);
+  }
+
+  if (args.compact) {
+    const names = docs.map((d) => String(d["name"] ?? ""));
+    if (fmt === "json") {
+      process.stdout.write(JSON.stringify(names, null, 2) + "\n");
+    } else {
+      console.log(names.join("\n"));
+    }
+    return;
+  }
 
   if (fmt === "json") {
     process.stdout.write(JSON.stringify(docs, null, 2) + "\n");

@@ -5,9 +5,11 @@ const DEFAULT_EXCLUDE = ["raven", "sync_invalid_tokens"];
 
 interface LogsArgs {
   limit?: number;
-  method?: string;          // --method: include only entries whose method contains this
-  exclude?: string[];       // --exclude-method: skip entries whose method contains any of these
+  method?: string;            // --method: include only entries whose method contains this
+  exclude?: string[];         // --exclude-method: skip entries whose method contains any of these
   noDefaultExclude?: boolean; // --no-default-exclude: show everything including Raven noise
+  since?: string;             // --since YYYY-MM-DD: only entries created after this date
+  compact?: boolean;          // --compact: omit error traceback (name/creation/method only)
   format?: string;
 }
 
@@ -16,24 +18,29 @@ export async function cmdLogs(client: FrappeClient, args: LogsArgs): Promise<voi
   if (args.method) {
     filters.push(["method", "like", `%${args.method}%`]);
   }
+  if (args.since) {
+    filters.push(["creation", ">=", args.since]);
+  }
 
   const userLimit = args.limit ?? 20;
   const excludePatterns = args.noDefaultExclude
     ? (args.exclude ?? [])
     : [...DEFAULT_EXCLUDE, ...(args.exclude ?? [])];
 
-  // Fetch extra entries when default-exclude is active — server-side limit applies before
-  // client-side filtering, so limit=20 could return 0 useful entries if all are noise.
   const fetchLimit = excludePatterns.length ? userLimit * 3 : userLimit;
+
+  // --compact omits error traceback — saves ~3KB per entry in JSON output
+  const fields = args.compact
+    ? ["name", "method", "creation"]
+    : ["name", "method", "error", "creation"];
 
   const docs = await client.listDocs("Error Log", {
     filters,
-    fields: ["name", "method", "error", "creation"],
+    fields,
     limit: fetchLimit,
     orderBy: "creation desc",
   });
 
-  // Client-side exclude filter — Frappe's `not like` with multiple values needs OR logic
   const filtered = (excludePatterns.length
     ? docs.filter((d) => {
         const m = String(d["method"] ?? "").toLowerCase();
@@ -44,7 +51,6 @@ export async function cmdLogs(client: FrappeClient, args: LogsArgs): Promise<voi
 
   const skipped = docs.length - filtered.length;
 
-  // Always warn to stderr so JSON stdout stays clean and user knows entries were hidden
   if (skipped > 0) {
     process.stderr.write(
       `(${skipped} entries hidden by default exclude filter — use --no-default-exclude to show all)\n`,

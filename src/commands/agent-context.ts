@@ -1,4 +1,5 @@
-import { APPS } from "../apps.ts";
+import { APPS, KEY_FIELDS } from "../apps.ts";
+import { FrappeClient } from "../client.ts";
 
 // Bump when verbs, flags, or auth shape changes — agents use this to invalidate cached schemas
 const SCHEMA_VERSION = "2";
@@ -8,35 +9,70 @@ const VERBS = [
     name: "get",
     description: "List docs or fetch one by name",
     readonly_safe: true,
-    flags: ["--filter field=value (repeatable)", "--fields name,status,...", "--limit n (default 20)", "-o json|table|csv"],
+    flags: ["--filter field=value (repeatable)", "--fields name,status,...", "--limit n (default 20)", "--sparse", "--strip-meta", "-o json|table|csv"],
     example: "frappe-ctl next get SalesOrder --filter \"status=Open\" --limit 20",
+  },
+  {
+    name: "count",
+    description: "Count docs matching filter — returns a plain integer. Use instead of get when cardinality is all you need.",
+    readonly_safe: true,
+    flags: ["--filter field=value (repeatable)"],
+    example: "frappe-ctl next count \"Sales Order\" --filter \"status=Open\"",
+  },
+  {
+    name: "search",
+    description: "Text search within a DocType by title/name field. Auto-detects title_field from DocType meta.",
+    readonly_safe: true,
+    flags: ["--field <fieldname> (override search field)", "--filter field=value (additional filters)", "--limit n (default 20)", "--sparse", "-o json|table|csv"],
+    example: "frappe-ctl next search Project \"V Builders\"",
   },
   {
     name: "describe",
     description: "Show DocType schema: field names, types, required flags",
     readonly_safe: true,
-    flags: ["-o json|table"],
-    example: "frappe-ctl next describe SalesOrder",
+    flags: ["--required (required fields only)", "--compact (fieldname/type/label only)", "--names-only (fieldname list only)", "--relationships (Link/Table fields only)", "-o json|table"],
+    example: "frappe-ctl next describe SalesOrder --required",
+  },
+  {
+    name: "link",
+    description: "Follow a Link field and return the linked doc in one call.",
+    readonly_safe: true,
+    flags: ["--sparse", "--strip-meta", "-o json|table"],
+    example: "frappe-ctl next link \"Sales Order\" SO-001 project",
+  },
+  {
+    name: "validate",
+    description: "Pre-flight check: verify --data has all required fields for a DocType. No server write.",
+    readonly_safe: true,
+    flags: ["--data '{...}' (required)"],
+    example: "frappe-ctl next validate \"Purchase Order\" --data '{\"supplier\":\"Acme\"}'",
+  },
+  {
+    name: "diff",
+    description: "Show what fields would change if --data were patched onto an existing doc. Read-only.",
+    readonly_safe: true,
+    flags: ["--data '{...}' (required)"],
+    example: "frappe-ctl next diff Project PROJ-001 --data '{\"status\":\"Completed\"}'",
   },
   {
     name: "apply",
     description: "Create or update a doc from a JSON file (or stdin via -). doc has name → PUT update; no name → POST create.",
     readonly_safe: false,
-    flags: ["--file <path|-> (required)", "--dry-run", "-o json|table"],
+    flags: ["--file <path|-> (required)", "--dry-run", "--sparse", "--strip-meta", "-o json|table"],
     example: "frappe-ctl next apply --file customer.json",
   },
   {
     name: "create",
     description: "Create a new doc. Returns the created doc.",
     readonly_safe: false,
-    flags: ["--data '{\"field\":\"value\"}' (required)", "--dry-run", "-o json|table"],
+    flags: ["--data '{\"field\":\"value\"}' (required)", "--dry-run", "--sparse", "--strip-meta", "-o json|table"],
     example: "frappe-ctl next create Customer --data '{\"customer_name\":\"Acme\",\"customer_type\":\"Company\"}'",
   },
   {
     name: "patch",
     description: "Update fields on an existing doc. Returns updated doc.",
     readonly_safe: false,
-    flags: ["--data '{\"field\":\"value\"}' (required)", "--dry-run", "-o json|table"],
+    flags: ["--data '{\"field\":\"value\"}' (required)", "--dry-run", "--sparse", "--strip-meta", "-o json|table"],
     example: "frappe-ctl next patch SalesOrder SO-001 --data '{\"status\":\"On Hold\"}'",
   },
   {
@@ -85,7 +121,7 @@ const VERBS = [
     name: "bulk",
     description: "Patch or delete all docs matching a filter. Paginated via listAll (100/page). Partial-failure tolerant — outputs {total,success,failed,errors[]}.",
     readonly_safe: false,
-    flags: ["patch|delete (sub-verb, required)", "--filter field=value (required, repeatable)", "--data '{...}' (required for patch)", "--force (required for delete)", "--dry-run"],
+    flags: ["patch|delete (sub-verb, required)", "--filter field=value (required, repeatable)", "--data '{...}' (required for patch)", "--force (required for delete)", "--dry-run (lists affected doc names)"],
     example: "frappe-ctl next bulk patch SalesOrder --filter \"status=Draft\" --data '{\"status\":\"Cancelled\"}' --dry-run",
   },
   {
@@ -99,32 +135,49 @@ const VERBS = [
     name: "report",
     description: "Run a saved Frappe Report by exact name.",
     readonly_safe: true,
-    flags: ["--filter '{\"company\":\"Acme\"}' (JSON object)", "-o json|table|csv"],
+    flags: ["--filter '{\"company\":\"Acme\"}' (JSON object)", "--sparse (keyed objects, nulls stripped)", "-o json|table|csv"],
     example: "frappe-ctl next report \"Accounts Receivable\" --filter '{\"company\":\"My Co\"}'",
   },
   {
     name: "resources",
     description: "List all DocTypes available for an app, with module and submittable flag.",
     readonly_safe: true,
-    flags: ["-o json|table|csv"],
-    example: "frappe-ctl next resources",
+    flags: ["--compact (name list only)", "--submittable (filter to submittable DocTypes)", "-o json|table|csv"],
+    example: "frappe-ctl next resources --compact",
   },
   {
     name: "logs",
     description: "Tail Frappe Error Log — most recent entries first.",
     readonly_safe: true,
-    flags: ["--limit n (default 20)", "--method <substring> filter by method name", "-o json|table|csv"],
-    example: "frappe-ctl next logs --limit 50 --method submit",
+    flags: ["--limit n (default 20)", "--method <substring>", "--since YYYY-MM-DD", "--compact (omit traceback)", "-o json|table|csv"],
+    example: "frappe-ctl next logs --since 2026-06-10 --compact",
   },
 ];
 
 const GLOBAL_FLAGS = [
   { flag: "--site <profile>", description: "Override the active profile for this command" },
   { flag: "--dry-run", description: "Print what would happen without making any writes" },
+  { flag: "--sparse", description: "Strip null/empty/zero fields from output (reduces tokens ~55%)" },
+  { flag: "--strip-meta", description: "Remove Frappe system fields (owner, creation, etc) from output" },
   { flag: "-o json|table|csv", description: "Output format. Default: table in TTY, json when piped" },
 ];
 
-export async function cmdAgentContext(): Promise<void> {
+export interface AgentContextArgs {
+  client?: FrappeClient;
+  doctypes?: string[];       // --doctypes "Project,Sales Order": scope to specific DocTypes
+  includeCounts?: boolean;   // --include-counts: add live record_count per DocType
+  compact?: boolean;         // --compact: required fields only per DocType
+  site?: string;             // active site URL (for output metadata)
+}
+
+export async function cmdAgentContext(opts: AgentContextArgs = {}): Promise<void> {
+  // With --doctypes: output compact DocType schema (agent session startup context)
+  if (opts.doctypes?.length && opts.client) {
+    await outputDoctypeSchema(opts);
+    return;
+  }
+
+  // Default: static CLI schema (backward compat, no client needed)
   const apps = Object.values(APPS).map((a) => ({
     alias: a.alias,
     name: a.name,
@@ -165,4 +218,62 @@ export async function cmdAgentContext(): Promise<void> {
   };
 
   process.stdout.write(JSON.stringify(context, null, 2) + "\n");
+}
+
+interface FrappeField {
+  fieldname: string;
+  fieldtype: string;
+  reqd: number;
+}
+
+async function outputDoctypeSchema(opts: AgentContextArgs): Promise<void> {
+  const client = opts.client!;
+  const doctypeEntries: Record<string, unknown> = {};
+
+  for (const doctype of opts.doctypes!) {
+    const meta = await client.getDocTypeMeta(doctype) as {
+      name: string;
+      is_submittable?: number;
+      fields?: FrappeField[];
+    };
+
+    const fields = (meta.fields ?? []).filter(
+      (f) => f.fieldtype !== "Section Break" && f.fieldtype !== "Column Break" && f.fieldtype !== "Tab Break",
+    );
+    const requiredFields = fields.filter((f) => f.reqd === 1).map((f) => f.fieldname);
+    const keyFields = KEY_FIELDS[doctype] ?? requiredFields;
+
+    const entry: Record<string, unknown> = {
+      is_submittable: !!(meta.is_submittable),
+      required_fields: requiredFields,
+      key_fields: keyFields,
+    };
+
+    if (opts.includeCounts) {
+      entry["record_count"] = await client.countDocs(doctype);
+    }
+
+    if (!opts.compact) {
+      // Full field list when not compact
+      entry["fields"] = fields.map((f) => ({
+        fieldname: f.fieldname,
+        fieldtype: f.fieldtype,
+        reqd: f.reqd,
+      }));
+    }
+
+    doctypeEntries[doctype] = entry;
+  }
+
+  const output: Record<string, unknown> = {
+    schema_version: SCHEMA_VERSION,
+    generated_at: new Date().toISOString(),
+    doctypes: doctypeEntries,
+  };
+
+  if (opts.site) {
+    output["site"] = opts.site;
+  }
+
+  process.stdout.write(JSON.stringify(output, null, 2) + "\n");
 }
