@@ -1,0 +1,9 @@
+# Dev/test files — not needed by end users
+src/**/*.test.ts
+src/__fixtures__/
+docs/
+bun.lock
+tsconfig.json
+.claude/
+*.md
+!README.md
