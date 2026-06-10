@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>frappe-ctl — The missing CLI for Frappe &amp; ERPNext</title>
+  <meta name="description" content="kubectl-style CLI for ERPNext and the Frappe ecosystem. Built for humans and AI agents." />
+  <meta property="og:title" content="frappe-ctl" />
+  <meta property="og:description" content="Talk to ERPNext like a colleague who knows the system." />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔌</text></svg>" />
+  <style>
+    :root {
+      --bg: #0d1117;
+      --bg2: #161b22;
+      --bg3: #21262d;
+      --border: #30363d;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --green: #3fb950;
+      --blue: #58a6ff;
+      --yellow: #d29922;
+      --purple: #bc8cff;
+      --red: #f85149;
+      --radius: 8px;
+      --mono: 'SF Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace;
+      --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 16px;
+      line-height: 1.6;
+    }
+    a { color: var(--blue); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* Layout */
+    .container { max-width: 860px; margin: 0 auto; padding: 0 24px; }
+
+    /* Nav */
+    nav {
+      border-bottom: 1px solid var(--border);
+      padding: 16px 0;
+      position: sticky;
+      top: 0;
+      background: var(--bg);
+      z-index: 10;
+    }
+    nav .inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+    .logo { font-family: var(--mono); font-size: 15px; color: var(--text); font-weight: 600; }
+    .logo span { color: var(--green); }
+    nav ul { list-style: none; display: flex; gap: 24px; }
+    nav ul li a { color: var(--muted); font-size: 14px; }
+    nav ul li a:hover { color: var(--text); text-decoration: none; }
+
+    /* Hero */
+    .hero {
+      padding: 80px 0 64px;
+      text-align: center;
+    }
+    .badge {
+      display: inline-block;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 4px 14px;
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 28px;
+      font-family: var(--mono);
+    }
+    .badge .dot { color: var(--green); margin-right: 6px; }
+    h1 {
+      font-size: clamp(28px, 5vw, 48px);
+      font-weight: 700;
+      line-height: 1.2;
+      margin-bottom: 20px;
+      letter-spacing: -0.5px;
+    }
+    h1 em { font-style: normal; color: var(--green); }
+    .subtitle {
+      font-size: 18px;
+      color: var(--muted);
+      max-width: 560px;
+      margin: 0 auto 40px;
+    }
+
+    /* Install block */
+    .install-box {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 20px;
+      font-family: var(--mono);
+      font-size: 15px;
+      cursor: pointer;
+      transition: border-color 0.15s;
+      position: relative;
+    }
+    .install-box:hover { border-color: var(--blue); }
+    .install-box .prompt { color: var(--muted); user-select: none; }
+    .install-box .cmd { color: var(--green); }
+    .copy-btn {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      border-radius: 5px;
+      padding: 3px 10px;
+      font-size: 12px;
+      cursor: pointer;
+      font-family: var(--sans);
+      transition: all 0.15s;
+    }
+    .copy-btn:hover { background: var(--border); color: var(--text); }
+    .copy-btn.copied { color: var(--green); border-color: var(--green); }
+    .install-note { margin-top: 10px; font-size: 13px; color: var(--muted); }
+    .install-note a { color: var(--blue); }
+
+    /* Quickstart */
+    section { padding: 64px 0; border-top: 1px solid var(--border); }
+    h2 { font-size: 24px; font-weight: 600; margin-bottom: 8px; }
+    .section-sub { color: var(--muted); margin-bottom: 40px; }
+
+    .steps { display: flex; flex-direction: column; gap: 32px; }
+    .step { display: flex; gap: 20px; }
+    .step-num {
+      width: 32px;
+      height: 32px;
+      min-width: 32px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--mono);
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+    .step-body h3 { font-size: 16px; font-weight: 600; margin-bottom: 8px; }
+    .step-body p { color: var(--muted); font-size: 14px; margin-bottom: 10px; }
+
+    /* Code blocks */
+    .code-block {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      font-family: var(--mono);
+      font-size: 13.5px;
+      line-height: 1.7;
+      overflow-x: auto;
+      position: relative;
+    }
+    .code-block .line { display: block; }
+    .code-block .comment { color: var(--muted); }
+    .code-block .cmd-line::before { content: '$ '; color: var(--muted); }
+    .code-block .out { color: var(--muted); }
+    .code-block .key { color: var(--blue); }
+    .code-block .val { color: var(--green); }
+    .code-block .str { color: var(--yellow); }
+    .code-block .flag { color: var(--purple); }
+
+    /* Examples */
+    .examples { display: flex; flex-direction: column; gap: 24px; }
+    .example-label {
+      font-size: 13px;
+      color: var(--muted);
+      font-family: var(--mono);
+      margin-bottom: 6px;
+    }
+
+    /* Two paths */
+    .paths { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    @media (max-width: 600px) { .paths { grid-template-columns: 1fr; } }
+    .path-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      transition: border-color 0.15s;
+    }
+    .path-card:hover { border-color: var(--blue); }
+    .path-icon { font-size: 28px; margin-bottom: 12px; }
+    .path-card h3 { font-size: 16px; font-weight: 600; margin-bottom: 8px; }
+    .path-card p { font-size: 14px; color: var(--muted); margin-bottom: 16px; }
+    .path-card a.cta {
+      display: inline-block;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 16px;
+      font-size: 13px;
+      color: var(--text);
+    }
+    .path-card a.cta:hover { border-color: var(--blue); text-decoration: none; }
+
+    /* Footer */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 32px 0;
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    footer a { color: var(--muted); }
+    footer a:hover { color: var(--text); }
+    .footer-links { display: flex; gap: 20px; justify-content: center; margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="inner">
+    <span class="logo"><span>❯</span> frappe-ctl</span>
+    <ul>
+      <li><a href="#quickstart">Quickstart</a></li>
+      <li><a href="#examples">Examples</a></li>
+      <li><a href="#mcp">MCP</a></li>
+      <li><a href="https://github.com/MalharDotTech/frappe-ctl">GitHub</a></li>
+    </ul>
+  </div>
+</nav>
+
+<!-- ── Hero ───────────────────────────────────────────────────────── -->
+<div class="hero">
+  <div class="container">
+    <div class="badge"><span class="dot">●</span>v0.2.0 — Phase 2 complete</div>
+    <h1>Talk to <em>ERPNext</em><br>like a colleague who knows the system.</h1>
+    <p class="subtitle">
+      A <code style="font-family:var(--mono);font-size:15px;color:var(--text)">kubectl</code>-style CLI for the entire Frappe ecosystem.
+      One tool for humans and AI agents.
+    </p>
+
+    <div style="display:flex;flex-direction:column;align-items:center;gap:8px;">
+      <div class="install-box" onclick="copyInstall(this)">
+        <span class="prompt">$</span>
+        <span class="cmd" id="install-cmd">bun add -g frappe-ctl</span>
+        <button class="copy-btn" id="copy-btn">copy</button>
+      </div>
+      <p class="install-note">Requires <a href="https://bun.sh" target="_blank">Bun</a> ≥ 1.3 · also works with <code style="font-family:var(--mono);font-size:12px">npm i -g frappe-ctl</code></p>
+    </div>
+  </div>
+</div>
+
+<!-- ── Quickstart ──────────────────────────────────────────────────── -->
+<section id="quickstart">
+  <div class="container">
+    <h2>Quickstart</h2>
+    <p class="section-sub">From zero to your first ERPNext result in under 2 minutes.</p>
+
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <h3>Install</h3>
+          <div class="code-block">
+            <span class="line cmd-line">bun add -g frappe-ctl</span>
+            <span class="line cmd-line">frappe-ctl --version</span>
+            <span class="line out">&nbsp;&nbsp;0.2.0</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <h3>Add your site profile</h3>
+          <p>Get your API key from <strong>Frappe → User Settings → API Access</strong>.</p>
+          <div class="code-block">
+            <span class="line cmd-line">frappe-ctl profile add mysite \</span>
+            <span class="line">&nbsp;&nbsp;--url https://mycompany.erpnext.com \</span>
+            <span class="line">&nbsp;&nbsp;--key YOUR_API_KEY \</span>
+            <span class="line">&nbsp;&nbsp;--secret YOUR_API_SECRET</span>
+            <span class="line">&nbsp;</span>
+            <span class="line cmd-line">frappe-ctl profile use mysite</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <h3>Run your first command</h3>
+          <div class="code-block">
+            <span class="line cmd-line">frappe-ctl next get Customer --limit 5 --sparse</span>
+            <span class="line out">&nbsp;</span>
+            <span class="line out">  NAME              CUSTOMER_NAME       CUSTOMER_TYPE</span>
+            <span class="line out">  CUST-0001         Acme Corp           Company</span>
+            <span class="line out">  CUST-0002         BuildRight Infra     Company</span>
+            <span class="line out">  ...</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ── Examples ───────────────────────────────────────────────────── -->
+<section id="examples">
+  <div class="container">
+    <h2>Examples</h2>
+    <p class="section-sub">The grammar is always: <code style="font-family:var(--mono);color:var(--text)">frappe-ctl &lt;app&gt; &lt;verb&gt; &lt;DocType&gt; [name] [flags]</code></p>
+
+    <div class="examples">
+
+      <div>
+        <p class="example-label">// How many open Sales Orders?</p>
+        <div class="code-block">
+          <span class="line cmd-line">frappe-ctl next count <span class="str">"Sales Order"</span> --filter <span class="str">"status=Open"</span></span>
+          <span class="line out">  47</span>
+        </div>
+      </div>
+
+      <div>
+        <p class="example-label">// Find a project by partial name</p>
+        <div class="code-block">
+          <span class="line cmd-line">frappe-ctl next search Project <span class="str">"V Builders"</span> <span class="flag">--sparse</span></span>
+          <span class="line out">  [{ "name": "PROJ-0043", "project_name": "V Builders Phase 2", "status": "Open" }]</span>
+        </div>
+      </div>
+
+      <div>
+        <p class="example-label">// What fields does Sales Order require?</p>
+        <div class="code-block">
+          <span class="line cmd-line">frappe-ctl next describe <span class="str">"Sales Order"</span> <span class="flag">--required</span></span>
+          <span class="line out">  FIELDNAME          FIELDTYPE    LABEL</span>
+          <span class="line out">  customer           Link         Customer</span>
+          <span class="line out">  transaction_date   Date         Date</span>
+          <span class="line out">  delivery_date      Date         Delivery Date</span>
+          <span class="line out">  ...</span>
+        </div>
+      </div>
+
+      <div>
+        <p class="example-label">// Check payload before creating (no wasted API calls)</p>
+        <div class="code-block">
+          <span class="line cmd-line">frappe-ctl next validate <span class="str">"Sales Order"</span> \</span>
+          <span class="line">&nbsp;&nbsp;--data <span class="str">'{"customer":"Acme Corp"}'</span> \</span>
+          <span class="line">&nbsp;&nbsp;<span class="flag">--output json</span></span>
+          <span class="line out">&nbsp;</span>
+          <span class="line out">  { <span class="key">"valid"</span>: <span class="val">false</span>, <span class="key">"missing"</span>: [<span class="str">"transaction_date"</span>] }</span>
+        </div>
+      </div>
+
+      <div>
+        <p class="example-label">// Follow a link field — Sales Order → its Project, one command</p>
+        <div class="code-block">
+          <span class="line cmd-line">frappe-ctl next link <span class="str">"Sales Order"</span> SAL-ORD-001 project <span class="flag">--sparse</span></span>
+          <span class="line out">  { <span class="key">"name"</span>: <span class="str">"PROJ-0043"</span>, <span class="key">"status"</span>: <span class="str">"Open"</span>, <span class="key">"customer"</span>: <span class="str">"Acme Corp"</span> }</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ── MCP ────────────────────────────────────────────────────────── -->
+<section id="mcp">
+  <div class="container">
+    <h2>MCP Server</h2>
+    <p class="section-sub">Let Claude or Cursor operate ERPNext directly — no custom code needed.</p>
+
+    <div class="paths">
+
+      <div class="path-card">
+        <div class="path-icon">👤</div>
+        <h3>You're a human user</h3>
+        <p>Use frappe-ctl from your terminal to explore, automate, and script ERPNext operations. Pipe JSON to <code style="font-family:var(--mono);font-size:12px">jq</code>, use in shell scripts, or just run one-liners.</p>
+        <a class="cta" href="#quickstart">→ Start with Quickstart</a>
+      </div>
+
+      <div class="path-card">
+        <div class="path-icon">🤖</div>
+        <h3>You're building an AI agent</h3>
+        <p>Start the MCP stdio server. Your agent gets typed tools: <code style="font-family:var(--mono);font-size:12px">frappe_get</code>, <code style="font-family:var(--mono);font-size:12px">frappe_count</code>, <code style="font-family:var(--mono);font-size:12px">frappe_validate</code>, and more.</p>
+        <a class="cta" href="#mcp-setup">→ MCP setup below</a>
+      </div>
+
+    </div>
+
+    <div id="mcp-setup" style="margin-top:40px;">
+      <p class="example-label" style="margin-bottom:10px;">// Add to claude.json (Claude Desktop / Cursor)</p>
+      <div class="code-block">
+        <span class="line">{</span>
+        <span class="line">&nbsp;&nbsp;<span class="key">"mcpServers"</span>: {</span>
+        <span class="line">&nbsp;&nbsp;&nbsp;&nbsp;<span class="key">"erpnext"</span>: {</span>
+        <span class="line">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="key">"command"</span>: <span class="str">"frappe-ctl"</span>,</span>
+        <span class="line">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="key">"args"</span>: [<span class="str">"mcp"</span>, <span class="str">"--site"</span>, <span class="str">"production"</span>]</span>
+        <span class="line">&nbsp;&nbsp;&nbsp;&nbsp;}</span>
+        <span class="line">&nbsp;&nbsp;}</span>
+        <span class="line">}</span>
+      </div>
+      <p style="font-size:13px;color:var(--muted);margin-top:10px;">
+        Read-only by default (5 tools). Add <code style="font-family:var(--mono)">--allow-mutations</code> to also expose create/patch/delete.
+        See <a href="https://github.com/MalharDotTech/frappe-ctl#mcp-server">full MCP docs →</a>
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ── Footer ────────────────────────────────────────────────────── -->
+<footer>
+  <div class="container">
+    <div class="footer-links">
+      <a href="https://github.com/MalharDotTech/frappe-ctl">GitHub</a>
+      <a href="https://github.com/MalharDotTech/frappe-ctl/tree/main/docs/adr">ADRs</a>
+      <a href="https://github.com/MalharDotTech/frappe-ctl/issues">Issues</a>
+      <a href="https://www.npmjs.com/package/frappe-ctl">npm</a>
+    </div>
+    <p>MIT · Built with ❤️ for the Frappe community</p>
+  </div>
+</footer>
+
+<script>
+  function copyInstall(el) {
+    const cmd = document.getElementById('install-cmd').textContent;
+    navigator.clipboard.writeText(cmd).then(() => {
+      const btn = document.getElementById('copy-btn');
+      btn.textContent = 'copied!';
+      btn.classList.add('copied');
+      setTimeout(() => {
+        btn.textContent = 'copy';
+        btn.classList.remove('copied');
+      }, 2000);
+    });
+  }
+</script>
+
+</body>
+</html>
