@@ -4,7 +4,7 @@ title: "MCP stdio adapter — typed tools, read-only by default, mutations behin
 date: 2026-06-11
 status: accepted
 frappe_version: "v16"
-frappe_ctl_version: "0.1.0"
+frappe_ctl_version: "0.2.0"
 tags: [mcp, agents, safety, auth]
 ---
 
