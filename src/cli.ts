@@ -29,6 +29,12 @@ import { saveToken } from "./token-store.ts";
 
 const VERSION = "0.1.0";
 
+export function isVerbAllowed(verb: string, enableVerbs: string | undefined): boolean {
+  if (enableVerbs === undefined) return true;
+  const allowed = enableVerbs.split(",").map((v) => v.trim()).filter(Boolean);
+  return allowed.includes(verb);
+}
+
 function die(msg: string): never {
   console.error(`error: ${msg}`);
   process.exit(1);
@@ -80,6 +86,7 @@ FLAGS
   --sparse                      Strip null/empty/zero fields from output
   --strip-meta                  Remove Frappe system fields (owner, creation, etc)
   -o, --output json|table|csv   Output format
+  --enable-verbs <list>         Comma-separated allowlist of permitted verbs (e.g. get,describe,count)
 
 ENV
   FRAPPE_CTL_READONLY=1         Block all mutations (safe for read-only agents)
@@ -335,6 +342,11 @@ async function main(): Promise<void> {
       `Read-only verbs allowed: get, count, search, describe, link, validate, diff, report, resources.\n` +
       `Unset FRAPPE_CTL_READONLY to allow writes.`,
     );
+  }
+
+  const enableVerbs = args.flags["enable-verbs"] !== undefined ? String(args.flags["enable-verbs"]) : undefined;
+  if (!isVerbAllowed(args.verb!, enableVerbs)) {
+    die(`Verb '${args.verb}' not in allowlist. Enabled: ${enableVerbs}`);
   }
 
   const fmt = args.flags["output"] ? String(args.flags["output"]) : undefined;
