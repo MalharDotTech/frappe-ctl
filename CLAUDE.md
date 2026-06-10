@@ -242,66 +242,11 @@ Sections: `## Decision` (1 sentence) · `## Context` · `## Consequences` (✅ p
 
 ---
 
-## Operator Agent Guide
+## Operator Agent Context
 
-### Session startup
-```bash
-frappe-ctl next agent-context \
-  --doctypes "Project,Sales Order,Purchase Order,Customer" \
-  --compact --include-counts
-```
+**Not in this file.** Operator patterns, token rules, safety, output parsing, MCP setup → `frappe-ctl.skill.md`.
 
-### Token rules
-- `--sparse` on all context fetches (55% reduction)
-- `count` before `get` for cardinality
-- `describe --required` before create (8 fields not 170)
-- `search` not `get --filter` for fuzzy lookups
-- `link` not two `get` calls for foreign keys
-
-### Before writing
-- `validate` before dynamic `create` — exit 0 = safe
-- `diff` before `patch` on important docs
-- `--dry-run` before any `bulk`
-
-### Safety
-- `count` before `delete` — know scope
-- Never `bulk delete` without `--dry-run` first
-- Never patch status on submittable docs — use `submit`/`cancel`/`workflow`
-- `FRAPPE_CTL_READONLY=1` for read-only sessions
-
-### Output parsing
-- Piped → JSON by default
-- `count` → `parseInt(stdout.trim())`
-- `validate` default: MISSING/UNKNOWN on stderr, exit 1, empty stdout
-- `validate --output json`: `{valid, required, missing, unknown}` on stdout, exit 0/1
-- `bulk` → `{ total, success, failed, errors[] }` always on stdout
-- Errors → stderr. Data → stdout. Never mixed.
-
-### Patterns
-```bash
-# find + fetch
-frappe-ctl next search Project "V Builders" --sparse
-frappe-ctl next count "Sales Order" --filter "project=PROJ-0005"
-
-# follow graph
-frappe-ctl next link "Sales Order" SAL-ORD-001 project --sparse
-
-# pre-flight
-frappe-ctl next validate "Purchase Order" --data '{"supplier":"Acme"}' --output json
-
-# preview patch
-frappe-ctl next diff Project PROJ-001 --data '{"status":"Completed"}'
-
-# async job
-frappe-ctl next call erpnext.stock.utils.make_stock_entry --data '{...}' --wait
-
-# bulk (dry-run first)
-frappe-ctl next bulk patch "Sales Order" --filter "status=Draft" --data '{"status":"Cancelled"}' --dry-run
-frappe-ctl next bulk patch "Sales Order" --filter "status=Draft" --data '{"status":"Cancelled"}'
-
-# sandboxed read-only
-frappe-ctl --enable-verbs get,count,search,describe next get Customer --sparse
-```
+This file is dev context only.
 
 ---
 

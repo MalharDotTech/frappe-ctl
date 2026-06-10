@@ -1,0 +1,7 @@
+---
+description: frappe-ctl operator patterns — token-efficient ERPNext CLI via AI agent
+globs: []
+alwaysApply: true
+---
+
+@frappe-ctl.skill.md

@@ -336,6 +336,25 @@ Current decisions: [001 auth header](docs/adr/20260610-001-auth-header-format.md
 
 ---
 
+## AI Agent Quick Setup
+
+`frappe-ctl.skill.md` ships with the package — drop it into your AI assistant and it instantly knows how to use the CLI efficiently.
+
+| Platform | How to load |
+|----------|------------|
+| **Claude Code** | Add `@frappe-ctl.skill.md` to your project `CLAUDE.md`, or copy to `.claude/commands/` |
+| **Cursor** | Already in `.cursor/rules/frappe-ctl.mdc` — auto-loads |
+| **OpenAI Codex CLI** | Included in `AGENTS.md` at project root — auto-loads |
+| **ChatGPT / Perplexity** | Paste contents of `frappe-ctl.skill.md` into custom instructions |
+| **Claude Desktop (MCP)** | See MCP setup below |
+
+After `bun add -g frappe-ctl`, find the skill file at:
+```
+$(bun pm ls -g | grep frappe-ctl)/frappe-ctl.skill.md
+```
+
+---
+
 ## Agent Integration
 
 frappe-ctl is built to plug directly into agent frameworks — Claude Code, Cursor, Codex, and any tool that can shell out.
