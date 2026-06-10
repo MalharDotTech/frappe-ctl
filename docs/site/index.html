@@ -371,36 +371,84 @@
   </div>
 </section>
 
-<!-- ── MCP ────────────────────────────────────────────────────────── -->
+<!-- ── AI Integration ─────────────────────────────────────────────── -->
 <section id="mcp">
   <div class="container">
-    <h2>MCP Server</h2>
-    <p class="section-sub">Let Claude or Cursor operate ERPNext directly — no custom code needed.</p>
+    <h2>AI Integration</h2>
+    <p class="section-sub">Two ways to plug frappe-ctl into any AI assistant.</p>
 
     <div class="paths">
 
       <div class="path-card">
-        <div class="path-icon">👤</div>
-        <h3>You're a human user</h3>
-        <p>Use frappe-ctl from your terminal to explore, automate, and script ERPNext operations. Pipe JSON to <code style="font-family:var(--mono);font-size:12px">jq</code>, use in shell scripts, or just run one-liners.</p>
-        <a class="cta" href="#quickstart">→ Start with Quickstart</a>
+        <div class="path-icon">📄</div>
+        <h3>Skill file — any AI</h3>
+        <p><code style="font-family:var(--mono);font-size:12px">frappe-ctl.skill.md</code> ships in the package. Drop it into your AI and it immediately knows the CLI — token patterns, verb reference, safety rules.</p>
+        <a class="cta" href="#skill-setup">→ Per-platform setup</a>
       </div>
 
       <div class="path-card">
-        <div class="path-icon">🤖</div>
-        <h3>You're building an AI agent</h3>
-        <p>Start the MCP stdio server. Your agent gets typed tools: <code style="font-family:var(--mono);font-size:12px">frappe_get</code>, <code style="font-family:var(--mono);font-size:12px">frappe_count</code>, <code style="font-family:var(--mono);font-size:12px">frappe_validate</code>, and more.</p>
-        <a class="cta" href="#mcp-setup">→ MCP setup below</a>
+        <div class="path-icon">🔌</div>
+        <h3>MCP server — Claude / Cursor</h3>
+        <p>Start a JSON-RPC stdio server. Claude Desktop and Cursor get typed tools (<code style="font-family:var(--mono);font-size:12px">frappe_get</code>, <code style="font-family:var(--mono);font-size:12px">frappe_count</code>, <code style="font-family:var(--mono);font-size:12px">frappe_validate</code>, …) — no commands to write.</p>
+        <a class="cta" href="#mcp-setup">→ MCP config</a>
       </div>
 
     </div>
 
-    <div id="mcp-setup" style="margin-top:40px;">
-      <p class="example-label" style="margin-bottom:10px;">// Add to claude.json (Claude Desktop / Cursor)</p>
+    <!-- Skill file setup -->
+    <div id="skill-setup" style="margin-top:48px;">
+      <p class="example-label" style="margin-bottom:16px;">// Skill file — load once, works everywhere</p>
+
+      <table style="width:100%;border-collapse:collapse;font-size:13.5px;margin-bottom:8px;">
+        <thead>
+          <tr>
+            <th style="text-align:left;padding:8px 12px;border-bottom:1px solid var(--border);color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:0.6px;">Platform</th>
+            <th style="text-align:left;padding:8px 12px;border-bottom:1px solid var(--border);color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:0.6px;">How to load</th>
+            <th style="text-align:left;padding:8px 12px;border-bottom:1px solid var(--border);color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:0.6px;white-space:nowrap;">Auto?</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="padding:9px 12px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:12px;color:var(--text);">Claude Code</td>
+            <td style="padding:9px 12px;border-bottom:1px solid var(--border);color:var(--muted);">Add <code style="font-family:var(--mono);font-size:12px">@frappe-ctl.skill.md</code> to your project <code style="font-family:var(--mono);font-size:12px">CLAUDE.md</code></td>
+            <td style="padding:9px 12px;border-bottom:1px solid var(--border);color:var(--muted);">1 line</td>
+          </tr>
+          <tr>
+            <td style="padding:9px 12px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:12px;color:var(--text);">Cursor</td>
+            <td style="padding:9px 12px;border-bottom:1px solid var(--border);color:var(--muted);">Already in <code style="font-family:var(--mono);font-size:12px">.cursor/rules/</code> — opens automatically</td>
+            <td style="padding:9px 12px;border-bottom:1px solid var(--border);color:var(--green);font-weight:600;">✓ auto</td>
+          </tr>
+          <tr>
+            <td style="padding:9px 12px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:12px;color:var(--text);">OpenAI Codex CLI</td>
+            <td style="padding:9px 12px;border-bottom:1px solid var(--border);color:var(--muted);"><code style="font-family:var(--mono);font-size:12px">AGENTS.md</code> at project root — loaded automatically</td>
+            <td style="padding:9px 12px;border-bottom:1px solid var(--border);color:var(--green);font-weight:600;">✓ auto</td>
+          </tr>
+          <tr>
+            <td style="padding:9px 12px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:12px;color:var(--text);">ChatGPT / Perplexity</td>
+            <td style="padding:9px 12px;border-bottom:1px solid var(--border);color:var(--muted);">Paste <code style="font-family:var(--mono);font-size:12px">frappe-ctl.skill.md</code> into custom instructions</td>
+            <td style="padding:9px 12px;border-bottom:1px solid var(--border);color:var(--muted);">paste</td>
+          </tr>
+          <tr>
+            <td style="padding:9px 12px;font-family:var(--mono);font-size:12px;color:var(--text);">Claude Desktop</td>
+            <td style="padding:9px 12px;color:var(--muted);">Add as project knowledge, or use MCP server below</td>
+            <td style="padding:9px 12px;color:var(--muted);">manual</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p style="font-size:13px;color:var(--muted);margin-top:8px;">
+        Find the skill file after install: <code style="font-family:var(--mono)">cat $(npm root -g)/frappe-ctl/frappe-ctl.skill.md</code>
+        &nbsp;·&nbsp; <a href="/quickstart#ai">Full AI setup guide →</a>
+      </p>
+    </div>
+
+    <!-- MCP config -->
+    <div id="mcp-setup" style="margin-top:48px;">
+      <p class="example-label" style="margin-bottom:10px;">// MCP — Add to claude_desktop_config.json or .cursor/mcp.json</p>
       <div class="code-block">
         <span class="line">{</span>
         <span class="line">  <span class="key">"mcpServers"</span>: {</span>
-        <span class="line">    <span class="key">"erpnext"</span>: {</span>
+        <span class="line">    <span class="key">"frappe"</span>: {</span>
         <span class="line">      <span class="key">"command"</span>: <span class="str">"frappe-ctl"</span>,</span>
         <span class="line">      <span class="key">"args"</span>: [<span class="str">"mcp"</span>, <span class="str">"--site"</span>, <span class="str">"production"</span>]</span>
         <span class="line">    }</span>
@@ -408,10 +456,11 @@
         <span class="line">}</span>
       </div>
       <p style="font-size:13px;color:var(--muted);margin-top:10px;">
-        Read-only by default (5 tools). Add <code style="font-family:var(--mono)">--allow-mutations</code> to also expose create/patch/delete.
-        See <a href="https://github.com/MalharDotTech/frappe-ctl#mcp-server">full MCP docs →</a>
+        Read-only by default (5 tools). Add <code style="font-family:var(--mono)">--allow-mutations</code> for create/patch/delete.
+        &nbsp;·&nbsp; <a href="/quickstart#ai">Full setup guide →</a>
       </p>
     </div>
+
   </div>
 </section>
 
