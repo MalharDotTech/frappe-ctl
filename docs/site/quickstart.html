@@ -327,7 +327,7 @@
       <li><a href="#apikey">Get your API key from Frappe</a></li>
       <li><a href="#profile">Create a profile</a></li>
       <li><a href="#first-commands">First 5 commands</a></li>
-      <li><a href="#mcp">MCP setup (Claude Desktop / Cursor)</a></li>
+      <li><a href="#ai">Connect your AI assistant</a></li>
       <li><a href="#readonly">Safe read-only mode</a></li>
       <li><a href="#troubleshoot">Troubleshooting</a></li>
     </ol>
@@ -477,30 +477,82 @@
     </table>
   </section>
 
-  <!-- MCP -->
-  <section id="mcp">
-    <h2>5. MCP setup</h2>
-    <p class="section-sub">Connect frappe-ctl to Claude Desktop or Cursor so your AI assistant can read and write ERPNext directly.</p>
+  <!-- AI SETUP -->
+  <section id="ai">
+    <h2>5. Connect your AI assistant</h2>
+    <p class="section-sub">Two ways — skill file for any AI, MCP server for Claude Desktop / Cursor.</p>
+
+    <!-- SKILL FILE -->
+    <h3 style="margin-top:0">Skill file — give any AI instant context</h3>
+    <p><code>frappe-ctl.skill.md</code> ships with the package. Drop it into your AI and it immediately knows how to use the CLI: token-efficient patterns, verb reference, safety rules, output parsing.</p>
+
+    <table class="cmd-table" style="margin-bottom:28px">
+      <thead><tr><th>Platform</th><th>How to load</th><th>Auto?</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Claude Code</td>
+          <td>Add <code>@frappe-ctl.skill.md</code> to your project <code>CLAUDE.md</code></td>
+          <td style="color:var(--muted)">manual</td>
+        </tr>
+        <tr>
+          <td>Claude Desktop</td>
+          <td>Add file as project knowledge or paste into system prompt</td>
+          <td style="color:var(--muted)">manual</td>
+        </tr>
+        <tr>
+          <td>Cursor</td>
+          <td><code>.cursor/rules/frappe-ctl.mdc</code> — already in the repo</td>
+          <td style="color:var(--green)">✓ auto</td>
+        </tr>
+        <tr>
+          <td>OpenAI Codex CLI</td>
+          <td><code>AGENTS.md</code> at project root — already in the repo</td>
+          <td style="color:var(--green)">✓ auto</td>
+        </tr>
+        <tr>
+          <td>ChatGPT / Perplexity</td>
+          <td>Paste <code>frappe-ctl.skill.md</code> contents into custom instructions</td>
+          <td style="color:var(--muted)">manual</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>After installing globally, find the skill file at:</p>
+    <pre><span class="prompt">$</span> cat $(npm root -g)/frappe-ctl/frappe-ctl.skill.md</pre>
+
+    <div class="callout tip">
+      <div class="icon">✓</div>
+      <div class="body">
+        <strong>Claude Code one-liner</strong>
+        Add this to your project <code>CLAUDE.md</code>:
+        <pre style="margin:8px 0 0">@./node_modules/frappe-ctl/frappe-ctl.skill.md</pre>
+        Claude Code loads it automatically on every session.
+      </div>
+    </div>
+
+    <!-- MCP -->
+    <h3 style="margin-top:40px">MCP server — direct tool calls</h3>
+    <p>Exposes frappe-ctl as typed tools so Claude / Cursor can call ERPNext directly without you writing commands. Best for Claude Desktop, Cursor, and VS Code.</p>
 
     <div class="path-cards">
       <div class="path-card">
         <div class="pc-icon">🤖</div>
         <h3>Claude Desktop</h3>
-        <p>Add to <code>claude_desktop_config.json</code>.</p>
+        <p>Edit <code>claude_desktop_config.json</code>.</p>
         <p>Mac: <code>~/Library/Application Support/Claude/</code><br>
         Windows: <code>%APPDATA%\Claude\</code></p>
       </div>
       <div class="path-card">
         <div class="pc-icon">⚡</div>
         <h3>Cursor / VS Code</h3>
-        <p>Add to your <code>.cursor/mcp.json</code> or VS Code MCP settings.</p>
+        <p>Edit <code>.cursor/mcp.json</code> or VS Code MCP settings.</p>
         <p>Same JSON config format.</p>
       </div>
     </div>
 
     <h3>Read-only (safe for exploration)</h3>
     <div class="config-card">
-      <div class="header">claude_desktop_config.json &nbsp;·&nbsp; mcpServers</div>
+      <div class="header">claude_desktop_config.json · mcpServers</div>
       <pre>{
   <span class="str">"mcpServers"</span>: {
     <span class="str">"frappe"</span>: {
@@ -511,12 +563,11 @@
   }
 }</pre>
     </div>
-
-    <p>This exposes 5 read-only tools: <code>frappe_get</code>, <code>frappe_count</code>, <code>frappe_search</code>, <code>frappe_describe</code>, <code>frappe_validate</code>. No mutations possible.</p>
+    <p>Exposes 5 read-only tools: <code>frappe_get</code>, <code>frappe_count</code>, <code>frappe_search</code>, <code>frappe_describe</code>, <code>frappe_validate</code>.</p>
 
     <h3>With write access</h3>
     <div class="config-card">
-      <div class="header">claude_desktop_config.json &nbsp;·&nbsp; mcpServers</div>
+      <div class="header">claude_desktop_config.json · mcpServers</div>
       <pre>{
   <span class="str">"mcpServers"</span>: {
     <span class="str">"frappe"</span>: {
@@ -527,22 +578,21 @@
   }
 }</pre>
     </div>
-
     <p>Adds <code>frappe_create</code>, <code>frappe_patch</code>, <code>frappe_delete</code>. Delete still requires <code>force: true</code>.</p>
 
     <h3>Pin to a specific profile</h3>
-    <pre>  "args": ["mcp", "--site", "prod"]</pre>
+    <pre>"args": ["mcp", "--site", "prod"]</pre>
 
-    <h3>Verify MCP is working</h3>
-    <p>After restarting Claude Desktop or Cursor, open a new chat and ask:</p>
+    <h3>Verify it's working</h3>
+    <p>Restart Claude Desktop / Cursor, open a new chat, ask:</p>
     <pre><span class="out">How many open Sales Orders are there on my ERPNext site?</span></pre>
-    <p>If the MCP is connected, the AI will call <code>frappe_count</code> automatically and return a live count.</p>
+    <p>If connected, the AI calls <code>frappe_count</code> and returns a live number.</p>
 
     <div class="callout info">
       <div class="icon">ℹ</div>
       <div class="body">
-        <strong>Using a non-default profile?</strong>
-        If your active profile is not the one you want the MCP to use, add <code>"--site", "prod"</code> (or whatever profile name) to the <code>args</code> array.
+        <strong>Non-default profile?</strong>
+        Add <code>"--site", "prod"</code> to the <code>args</code> array to pin the MCP to a specific profile.
       </div>
     </div>
   </section>
