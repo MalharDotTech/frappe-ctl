@@ -1,5 +1,5 @@
 node_modules/
 dist/
-frappe-ctl
+/frappe-ctl
 *.local
 .env

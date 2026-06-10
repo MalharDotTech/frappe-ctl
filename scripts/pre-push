@@ -1,0 +1,172 @@
+#!/usr/bin/env bash
+# pre-push hook — frappe-ctl deployment checklist
+# Runs automatically on every `git push`. Edit at .git/hooks/pre-push (local only).
+set -euo pipefail
+
+RED='\033[0;31m'; YELLOW='\033[1;33m'; GREEN='\033[0;32m'; CYAN='\033[0;36m'; RESET='\033[0m'
+BOLD='\033[1m'
+
+fail()  { echo -e "${RED}✗ FAIL${RESET}  $1"; FAILURES=$((FAILURES+1)); }
+warn()  { echo -e "${YELLOW}⚠ WARN${RESET}  $1"; WARNINGS=$((WARNINGS+1)); }
+ok()    { echo -e "${GREEN}✓ OK${RESET}    $1"; }
+info()  { echo -e "${CYAN}→${RESET}      $1"; }
+prompt(){
+  if [[ -t 0 ]]; then
+    echo -e "${YELLOW}?${RESET}      $1 ${BOLD}[y/N]${RESET} "
+    read -r ans < /dev/tty
+    [[ "$ans" =~ ^[Yy]$ ]]
+  else
+    return 1  # non-interactive: default no
+  fi
+}
+
+FAILURES=0
+WARNINGS=0
+
+echo ""
+echo -e "${BOLD}━━━ frappe-ctl pre-push checklist ━━━${RESET}"
+echo ""
+
+# ── 1. Tests ────────────────────────────────────────────────────────────────
+echo -e "${BOLD}[1/7] Tests${RESET}"
+if bun test --bail 2>&1 | tail -5; then
+  ok "all tests pass"
+else
+  fail "tests failing — fix before push"
+fi
+echo ""
+
+# ── 2. Version consistency ──────────────────────────────────────────────────
+echo -e "${BOLD}[2/7] Version consistency${RESET}"
+PKG_VERSION=$(node -p "require('./package.json').version" 2>/dev/null || grep '"version"' package.json | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+info "package.json version: $PKG_VERSION"
+
+# Check only NEW ADRs added in this push have the current version
+NEW_ADR_FILES=$(git diff --name-only HEAD~1 HEAD 2>/dev/null | { grep "^docs/adr/[0-9]" || true; })
+BAD_NEW_ADRS=""
+for f in $NEW_ADR_FILES; do
+  [[ -f "$f" ]] || continue
+  if ! grep -q "frappe_ctl_version: \"$PKG_VERSION\"" "$f"; then
+    BAD_NEW_ADRS="$BAD_NEW_ADRS $f"
+  fi
+done
+if [[ -n "$BAD_NEW_ADRS" ]]; then
+  fail "new ADR(s) missing frappe_ctl_version: \"$PKG_VERSION\":"
+  echo "$BAD_NEW_ADRS" | tr ' ' '\n' | grep . | sed 's/^/         /'
+else
+  ok "new ADRs have correct version"
+fi
+
+# Check CLAUDE.md version reference
+if grep -q "frappe_ctl_version: \"$PKG_VERSION\"" CLAUDE.md 2>/dev/null; then
+  ok "CLAUDE.md has correct version"
+else
+  warn "CLAUDE.md ADR frontmatter example may need version update to $PKG_VERSION"
+fi
+echo ""
+
+# ── 3. ADR ↔ README link sync ───────────────────────────────────────────────
+echo -e "${BOLD}[3/7] ADR links in README${RESET}"
+MISSING_LINKS=()
+for adr_file in docs/adr/[0-9]*.md; do
+  adr_name=$(basename "$adr_file" .md)
+  # Skip template
+  [[ "$adr_name" == "0000-template" ]] && continue
+  adr_num=$(echo "$adr_name" | grep -oE '[0-9]{3}' | head -1)
+  if ! grep -q "$adr_name" README.md; then
+    MISSING_LINKS+=("$adr_name")
+  fi
+done
+if [[ ${#MISSING_LINKS[@]} -gt 0 ]]; then
+  fail "ADRs not linked in README.md:"
+  printf '         %s\n' "${MISSING_LINKS[@]}"
+else
+  ok "all ADRs linked in README"
+fi
+echo ""
+
+# ── 4. CLAUDE.md + README touched when src/ changed ─────────────────────────
+echo -e "${BOLD}[4/7] Docs freshness${RESET}"
+SRC_CHANGED=$(git diff --name-only HEAD~1 HEAD 2>/dev/null | { grep "^src/" || true; } | wc -l | xargs)
+CLAUDE_CHANGED=$(git diff --name-only HEAD~1 HEAD 2>/dev/null | { grep "^CLAUDE.md" || true; } | wc -l | xargs)
+README_CHANGED=$(git diff --name-only HEAD~1 HEAD 2>/dev/null | { grep "^README.md" || true; } | wc -l | xargs)
+
+if [[ "$SRC_CHANGED" -gt 0 && "$CLAUDE_CHANGED" -eq 0 ]]; then
+  warn "$SRC_CHANGED src/ file(s) changed but CLAUDE.md not touched — did you need to update it?"
+else
+  ok "CLAUDE.md freshness OK"
+fi
+if [[ "$SRC_CHANGED" -gt 0 && "$README_CHANGED" -eq 0 ]]; then
+  warn "$SRC_CHANGED src/ file(s) changed but README.md not touched — new verb/feature documented?"
+else
+  ok "README.md freshness OK"
+fi
+echo ""
+
+# ── 5. npm registry ─────────────────────────────────────────────────────────
+echo -e "${BOLD}[5/7] npm registry${RESET}"
+NPM_VERSION=$(npm view frappe-ctl version 2>/dev/null || echo "unknown")
+info "local: $PKG_VERSION  |  npm: $NPM_VERSION"
+
+if [[ "$PKG_VERSION" != "$NPM_VERSION" ]]; then
+  warn "local version ($PKG_VERSION) != npm ($NPM_VERSION)"
+  if prompt "Publish to npm now? (requires npm login)"; then
+    bun publish && ok "published $PKG_VERSION to npm" || fail "npm publish failed"
+  else
+    warn "skipped npm publish — run 'bun publish' manually"
+  fi
+else
+  ok "npm is up to date ($NPM_VERSION)"
+fi
+echo ""
+
+# ── 6. Cloudflare / docs/site ───────────────────────────────────────────────
+echo -e "${BOLD}[6/7] Cloudflare Pages (docs/site/)${RESET}"
+SITE_CHANGED=$(git diff --name-only HEAD~1 HEAD 2>/dev/null | { grep "^docs/site/" || true; } | wc -l | xargs)
+if [[ "$SITE_CHANGED" -gt 0 ]]; then
+  info "$SITE_CHANGED file(s) in docs/site/ changed in last commit"
+  info "Cloudflare auto-deploys on push to main — verify at https://ctl.malhar.tech after push"
+  ok "site changes will deploy automatically"
+else
+  ok "no docs/site/ changes"
+fi
+
+# Quick live check (non-blocking)
+HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 https://ctl.malhar.tech 2>/dev/null || echo "000")
+if [[ "$HTTP_STATUS" == "200" ]]; then
+  ok "ctl.malhar.tech is live (HTTP $HTTP_STATUS)"
+elif [[ "$HTTP_STATUS" == "000" ]]; then
+  warn "could not reach ctl.malhar.tech (offline or timeout)"
+else
+  warn "ctl.malhar.tech returned HTTP $HTTP_STATUS"
+fi
+echo ""
+
+# ── 7. Manual checklist prompts ─────────────────────────────────────────────
+echo -e "${BOLD}[7/7] Manual checks${RESET}"
+
+# Only prompt if this looks like a feature/fix push (not just docs)
+NEW_ADRS=$(git diff --name-only HEAD~1 HEAD 2>/dev/null | { grep "^docs/adr/[0-9]" || true; } | wc -l | xargs)
+if [[ "$SRC_CHANGED" -gt 0 && "$NEW_ADRS" -eq 0 ]]; then
+  warn "src/ changed but no new ADR — was this decision non-obvious? (new verb, Frappe quirk, auth change?)"
+fi
+
+ok "push checklist complete"
+echo ""
+
+# ── Summary ──────────────────────────────────────────────────────────────────
+echo -e "${BOLD}━━━ Summary ━━━${RESET}"
+if [[ $FAILURES -gt 0 ]]; then
+  echo -e "${RED}${BOLD}$FAILURES failure(s) — push blocked.${RESET}"
+  echo ""
+  echo "Fix issues above and re-push."
+  exit 1
+elif [[ $WARNINGS -gt 0 ]]; then
+  echo -e "${YELLOW}${BOLD}$WARNINGS warning(s) — push proceeding.${RESET}"
+  echo ""
+else
+  echo -e "${GREEN}${BOLD}All checks passed.${RESET}"
+  echo ""
+fi
+
+exit 0

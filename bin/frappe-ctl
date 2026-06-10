@@ -1,0 +1,12 @@
+#!/usr/bin/env sh
+# frappe-ctl entry point — requires Bun (https://bun.sh)
+set -e
+
+if ! command -v bun >/dev/null 2>&1; then
+  echo "frappe-ctl requires Bun (https://bun.sh)" >&2
+  echo "Install: curl -fsSL https://bun.sh/install | bash" >&2
+  exit 1
+fi
+
+DIR=$(cd "$(dirname "$0")" && pwd)
+exec bun run "$DIR/../src/cli.ts" "$@"

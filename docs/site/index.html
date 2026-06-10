@@ -272,7 +272,7 @@
           <div class="code-block">
             <span class="line cmd-line">bun add -g frappe-ctl</span>
             <span class="line cmd-line">frappe-ctl --version</span>
-            <span class="line out">&nbsp;&nbsp;0.2.0</span>
+            <span class="line out">  0.2.0</span>
           </div>
         </div>
       </div>
@@ -284,10 +284,10 @@
           <p>Get your API key from <strong>Frappe → User Settings → API Access</strong>.</p>
           <div class="code-block">
             <span class="line cmd-line">frappe-ctl profile add mysite \</span>
-            <span class="line">&nbsp;&nbsp;--url https://mycompany.erpnext.com \</span>
-            <span class="line">&nbsp;&nbsp;--key YOUR_API_KEY \</span>
-            <span class="line">&nbsp;&nbsp;--secret YOUR_API_SECRET</span>
-            <span class="line">&nbsp;</span>
+            <span class="line">  --url https://mycompany.erpnext.com \</span>
+            <span class="line">  --key YOUR_API_KEY \</span>
+            <span class="line">  --secret YOUR_API_SECRET</span>
+            <span class="line"> </span>
             <span class="line cmd-line">frappe-ctl profile use mysite</span>
           </div>
         </div>
@@ -299,7 +299,7 @@
           <h3>Run your first command</h3>
           <div class="code-block">
             <span class="line cmd-line">frappe-ctl next get Customer --limit 5 --sparse</span>
-            <span class="line out">&nbsp;</span>
+            <span class="line out"> </span>
             <span class="line out">  NAME              CUSTOMER_NAME       CUSTOMER_TYPE</span>
             <span class="line out">  CUST-0001         Acme Corp           Company</span>
             <span class="line out">  CUST-0002         BuildRight Infra     Company</span>
@@ -352,9 +352,9 @@
         <p class="example-label">// Check payload before creating (no wasted API calls)</p>
         <div class="code-block">
           <span class="line cmd-line">frappe-ctl next validate <span class="str">"Sales Order"</span> \</span>
-          <span class="line">&nbsp;&nbsp;--data <span class="str">'{"customer":"Acme Corp"}'</span> \</span>
-          <span class="line">&nbsp;&nbsp;<span class="flag">--output json</span></span>
-          <span class="line out">&nbsp;</span>
+          <span class="line">  --data <span class="str">'{"customer":"Acme Corp"}'</span> \</span>
+          <span class="line">  <span class="flag">--output json</span></span>
+          <span class="line out"> </span>
           <span class="line out">  { <span class="key">"valid"</span>: <span class="val">false</span>, <span class="key">"missing"</span>: [<span class="str">"transaction_date"</span>] }</span>
         </div>
       </div>
@@ -399,12 +399,12 @@
       <p class="example-label" style="margin-bottom:10px;">// Add to claude.json (Claude Desktop / Cursor)</p>
       <div class="code-block">
         <span class="line">{</span>
-        <span class="line">&nbsp;&nbsp;<span class="key">"mcpServers"</span>: {</span>
-        <span class="line">&nbsp;&nbsp;&nbsp;&nbsp;<span class="key">"erpnext"</span>: {</span>
-        <span class="line">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="key">"command"</span>: <span class="str">"frappe-ctl"</span>,</span>
-        <span class="line">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="key">"args"</span>: [<span class="str">"mcp"</span>, <span class="str">"--site"</span>, <span class="str">"production"</span>]</span>
-        <span class="line">&nbsp;&nbsp;&nbsp;&nbsp;}</span>
-        <span class="line">&nbsp;&nbsp;}</span>
+        <span class="line">  <span class="key">"mcpServers"</span>: {</span>
+        <span class="line">    <span class="key">"erpnext"</span>: {</span>
+        <span class="line">      <span class="key">"command"</span>: <span class="str">"frappe-ctl"</span>,</span>
+        <span class="line">      <span class="key">"args"</span>: [<span class="str">"mcp"</span>, <span class="str">"--site"</span>, <span class="str">"production"</span>]</span>
+        <span class="line">    }</span>
+        <span class="line">  }</span>
         <span class="line">}</span>
       </div>
       <p style="font-size:13px;color:var(--muted);margin-top:10px;">
