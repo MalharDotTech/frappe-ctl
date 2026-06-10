@@ -1,5 +1,8 @@
 # frappe-ctl
 
+[![npm version](https://img.shields.io/npm/v/frappe-ctl.svg)](https://www.npmjs.com/package/frappe-ctl)
+[![license](https://img.shields.io/npm/l/frappe-ctl.svg)](LICENSE)
+
 `kubectl`-style CLI for the Frappe ecosystem. One tool for every app built on Frappe — ERPNext, HRMS, CRM, Helpdesk, and more.
 
 ```
@@ -47,16 +50,27 @@ Design goals:
 ## Install
 
 ```bash
-# Requires Bun
-bun install
-
-# Run directly
-bun run src/cli.ts next get Customer
-
-# Or compile a binary
-bun build --compile --minify src/cli.ts --outfile frappe-ctl
-./frappe-ctl next get Customer
+bun add -g frappe-ctl
 ```
+
+Or with npm/npx (no global install):
+
+```bash
+npx frappe-ctl next get Customer
+```
+
+Requires [Bun](https://bun.sh) ≥ 1.3.0.
+
+**For development / contributing:**
+
+```bash
+git clone https://github.com/MalharDotTech/frappe-ctl
+cd frappe-ctl
+bun install
+bun run src/cli.ts next get Customer   # run from source
+```
+
+Full docs and quickstart: **[ctl.malhar.tech](https://ctl.malhar.tech)**
 
 ---
 
@@ -318,7 +332,7 @@ grep -rl "tags:.*auth" docs/adr/
 grep -rl "frappe-quirk" docs/adr/
 ```
 
-Current decisions: [001 auth header](docs/adr/20260610-001-auth-header-format.md) · [002 kubectl grammar](docs/adr/20260610-002-kubectl-grammar.md) · [003 zero deps](docs/adr/20260610-003-zero-dependencies.md) · [004 config functions](docs/adr/20260610-004-config-functions-not-constants.md) · [005 listDocTypes POST](docs/adr/20260610-005-listdoctypes-post-not-get.md) · [006 in filter](docs/adr/20260610-006-in-filter-comma-string.md) · [007 delete --force](docs/adr/20260610-007-delete-requires-force.md) · [008 TTY output](docs/adr/20260610-008-tty-output-detection.md) · [009 OAuth PKCE](docs/adr/20260610-009-oauth-pkce-explicit-client-id.md) · [010 bench out of scope](docs/adr/20260610-010-bench-out-of-scope.md) · [011 fixed OAuth port](docs/adr/20260610-011-fixed-oauth-redirect-port.md) · [012 arrayBuffer not text](docs/adr/20260610-012-arraybuffer-not-text.md) · [013 stdout drain](docs/adr/20260610-013-stdout-drain-before-exit.md) · [014 sparse/strip-meta](docs/adr/20260610-014-sparse-and-strip-meta-output-filters.md) · [015 new read verbs](docs/adr/20260610-015-count-search-link-validate-diff-verbs.md)
+Current decisions: [001 auth header](docs/adr/20260610-001-auth-header-format.md) · [002 kubectl grammar](docs/adr/20260610-002-kubectl-grammar.md) · [003 zero deps](docs/adr/20260610-003-zero-dependencies.md) · [004 config functions](docs/adr/20260610-004-config-functions-not-constants.md) · [005 listDocTypes POST](docs/adr/20260610-005-listdoctypes-post-not-get.md) · [006 in filter](docs/adr/20260610-006-in-filter-comma-string.md) · [007 delete --force](docs/adr/20260610-007-delete-requires-force.md) · [008 TTY output](docs/adr/20260610-008-tty-output-detection.md) · [009 OAuth PKCE](docs/adr/20260610-009-oauth-pkce-explicit-client-id.md) · [010 bench out of scope](docs/adr/20260610-010-bench-out-of-scope.md) · [011 fixed OAuth port](docs/adr/20260610-011-fixed-oauth-redirect-port.md) · [012 arrayBuffer not text](docs/adr/20260610-012-arraybuffer-not-text.md) · [013 stdout drain](docs/adr/20260610-013-stdout-drain-before-exit.md) · [014 sparse/strip-meta](docs/adr/20260610-014-sparse-and-strip-meta-output-filters.md) · [015 new read verbs](docs/adr/20260610-015-count-search-link-validate-diff-verbs.md) · [016 MCP stdio](docs/adr/20260611-016-mcp-stdio-adapter.md) · [017 validate --output json](docs/adr/20260611-017-validate-output-json.md) · [018 --enable-verbs](docs/adr/20260611-018-enable-verbs-allowlist.md) · [019 --wait async jobs](docs/adr/20260611-019-wait-on-async-jobs.md)
 
 ---
 
