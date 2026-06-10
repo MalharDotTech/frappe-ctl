@@ -2,6 +2,7 @@ import { describe, it, expect, spyOn, afterEach, mock } from "bun:test";
 import { FrappeClient } from "../client.ts";
 import { cmdValidate } from "./validate.ts";
 import { doctypeMetaResponse } from "../__fixtures__/api-responses.ts";
+import { captureOutput } from "../__fixtures__/test-helpers.ts";
 
 const client = new FrappeClient({ url: "http://test.localhost", apiKey: "k", apiSecret: "s" });
 
@@ -84,5 +85,50 @@ describe("cmdValidate", () => {
     const unknownLine = errors.find((e) => e.includes("custumer"));
     expect(unknownLine).toContain("did you mean: customer");
     exitSpy.mockRestore();
+  });
+
+  it("--output json outputs valid:true JSON on success", async () => {
+    mockFetch({ message: doctypeMetaResponse });
+    const { lines, restore } = captureOutput();
+    const exitSpy = spyOn(process, "exit").mockImplementation((() => {}) as () => never);
+
+    await cmdValidate(client, {
+      doctype: "Sales Order",
+      data: { customer: "Magic Peacock Studio", transaction_date: "2026-06-10" },
+      outputJson: true,
+    });
+    restore();
+    exitSpy.mockRestore();
+
+    const result = JSON.parse(lines[0]!) as { valid: boolean; required: string[] };
+    expect(result.valid).toBe(true);
+    expect(result.required).toContain("customer");
+    expect(result.required).toContain("transaction_date");
+  });
+
+  it("--output json outputs valid:false JSON with missing+unknown on failure", async () => {
+    mockFetch({ message: doctypeMetaResponse });
+    const { lines, restore } = captureOutput();
+    const exitSpy = spyOn(process, "exit").mockImplementation((() => {}) as () => never);
+
+    await cmdValidate(client, {
+      doctype: "Sales Order",
+      data: { custumer: "Magic Peacock Studio" }, // missing transaction_date, typo on customer
+      outputJson: true,
+    });
+    restore();
+
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    exitSpy.mockRestore();
+
+    const result = JSON.parse(lines[0]!) as {
+      valid: boolean;
+      missing: string[];
+      unknown: Array<{ field: string; suggestion: string | null }>;
+    };
+    expect(result.valid).toBe(false);
+    expect(result.missing).toContain("customer");
+    expect(result.missing).toContain("transaction_date");
+    expect(result.unknown.some((u) => u.field === "custumer" && u.suggestion === "customer")).toBe(true);
   });
 });

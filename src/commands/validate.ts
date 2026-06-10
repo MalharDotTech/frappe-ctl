@@ -3,6 +3,7 @@ import { FrappeClient } from "../client.ts";
 interface ValidateArgs {
   doctype: string;
   data: Record<string, unknown>;
+  outputJson?: boolean;
 }
 
 interface FrappeField {
@@ -27,11 +28,26 @@ export async function cmdValidate(client: FrappeClient, args: ValidateArgs): Pro
   const unknown = dataKeys.filter((k) => !allFieldNames.has(k));
 
   if (missing.length === 0 && unknown.length === 0) {
-    console.log("OK: all required fields present");
-    if (requiredFields.length > 0) {
-      console.log(`Required: ${requiredFields.join(", ")}`);
+    if (args.outputJson) {
+      process.stdout.write(JSON.stringify({ valid: true, required: requiredFields }) + "\n");
+    } else {
+      console.log("OK: all required fields present");
+      if (requiredFields.length > 0) {
+        console.log(`Required: ${requiredFields.join(", ")}`);
+      }
     }
     return;
+  }
+
+  if (args.outputJson) {
+    const unknownWithSuggestions = unknown.map((uk) => ({
+      field: uk,
+      suggestion: findClosest(uk, Array.from(allFieldNames)),
+    }));
+    process.stdout.write(
+      JSON.stringify({ valid: false, required: requiredFields, missing, unknown: unknownWithSuggestions }) + "\n",
+    );
+    process.exit(1);
   }
 
   if (missing.length > 0) {

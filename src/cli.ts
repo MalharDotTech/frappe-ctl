@@ -403,7 +403,8 @@ async function main(): Promise<void> {
       let data: Record<string, unknown>;
       try { data = JSON.parse(String(raw)) as Record<string, unknown>; }
       catch { die("--data must be valid JSON"); }
-      await cmdValidate(client, { doctype, data });
+      const outputJson = args.flags["output"] === "json";
+      await cmdValidate(client, { doctype, data, outputJson });
       break;
     }
 
