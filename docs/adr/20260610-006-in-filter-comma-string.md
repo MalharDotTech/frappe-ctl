@@ -4,7 +4,7 @@ title: "Frappe 'in' filter value must be a comma-string, not an array"
 date: 2026-06-10
 status: accepted
 frappe_version: "v16"
-frappe_ctl_version: "0.1.0"
+frappe_ctl_version: "0.2.0"
 tags: [frappe-quirk, filters, http]
 ---
 
