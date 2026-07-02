@@ -31,7 +31,7 @@ import { refreshAccessToken } from "./oauth.ts";
 import type { StoredToken } from "./token-store.ts";
 import { saveToken } from "./token-store.ts";
 
-const VERSION = "0.2.0";
+const VERSION = "0.3.0";
 
 // Canonical verb-router list — single source of truth cross-checked by
 // skill-file.test.ts against agent-context.ts::VERBS (ADR-025).
