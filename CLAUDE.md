@@ -127,6 +127,7 @@ src/
   oauth.ts            PKCE helpers
   token-store.ts      macOS Keychain + file fallback (0o600)
   errors.ts           AuthRequiredError — maps to exit code 4 (ADR-022)
+  skill-file.test.ts  frappe-ctl.skill.md verb freshness vs CLI_VERBS/VERBS (ADR-025)
   __fixtures__/       Shared mock responses
 ```
 
@@ -162,7 +163,7 @@ Every new verb: `*.test.ts` with happy path, flag behaviour, table + json output
 3. Add fixtures to `src/__fixtures__/api-responses.ts`
 4. Wire into `cli.ts` verb router (`switch (args.verb)`)
 5. Add to `usage()` in `cli.ts`
-6. Add to `VERBS` in `src/commands/agent-context.ts`
+6. Add to `CLI_VERBS` in `cli.ts` AND `VERBS` in `src/commands/agent-context.ts` AND the Verb Reference table in `frappe-ctl.skill.md` — `skill-file.test.ts` fails the build if any one of these three falls out of sync (ADR-025)
 7. Update CLAUDE.md file layout
 8. Non-obvious choice → ADR
 

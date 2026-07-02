@@ -50,7 +50,7 @@ Repo-as-project infrastructure, not code.
 ### Onboarding
 First-run experience — what a new user or new agent sees before they've done anything.
 
-- [ ] Skill file freshness check — `frappe-ctl.skill.md` must match the live verb set exactly before it becomes the install artifact. **Blocks skills.sh push.**
+- [x] Skill file freshness check — audit found zero current drift; built as an ongoing `bun test` guard (`skill-file.test.ts`), not a one-time fix, per discussion. Scoped to verb presence, not exhaustive flag parity — a skill file that mirrors `--help` 1:1 defeats its own token-efficiency purpose (ADR-025). Also closed a related gap: extracted `cli.ts`'s inline verb list into `CLI_VERBS`, cross-checked against `agent-context.ts::VERBS` — the full chain (CLI router ↔ VERBS ↔ skill file) is guarded, not just one link. Unblocks skills.sh push.
 - [ ] ASCII art on install — zero functional value, do whenever there's a spare 10 minutes.
 
 ### Fixes / Maintenance
@@ -89,7 +89,7 @@ Visual and interaction polish. Deferred this cycle — not blocking release.
 1. ~~Security urgent fix — `config.ts` plaintext `api_key`/`api_secret` with no file-mode restriction~~ — done, PR #2
 2. ~~Fixes — clear `cli.ts` mode-bit state, run ADR drift audit~~ — done, PR #3
 3. ~~Security (remaining) — silent-fallback fix, Keychain ACL scoping spike, headless parity confirmation, new ADR~~ — done, see ADR-020
-4. ~~Functional — `skills install` verb → exit code `4` → agent env-var detect → `--debug` flag~~ — done. jsonl/stats item remains parked, scope undefined.
-5. **Onboarding** — confirm skill file freshness *(next up)*
-6. Distribution — skills.sh push, `fctl` alias
+4. ~~Functional — `skills install` verb → exit code `4` → agent env-var detect → `--debug` flag~~ — done. Prompt→command usage analysis scoped and deliberately parked until real external usage exists (2026-07-03).
+5. ~~Onboarding — skill file freshness check~~ — done, ADR-025
+6. **Distribution** — skills.sh push, `fctl` alias *(next up)*
 7. Community/OSS + Aesthetics — next cycle
