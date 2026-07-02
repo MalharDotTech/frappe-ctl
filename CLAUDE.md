@@ -51,7 +51,7 @@ NOT `Bearer`, NOT `Basic`. Every transport layer uses this. See `src/client.ts` 
 `configDir()` / `configFile()` read `FRAPPE_CTL_CONFIG_DIR` at call time. Tests inject temp dir. Never convert to constants.
 
 ### Output pipe-safe
-TTY → table. Non-TTY → JSON. Always check `process.stdout.isTTY`.
+TTY → table. Non-TTY → JSON. Always check `process.stdout.isTTY`. Known agent env var (`agent-detect.ts::isAgentInvocation()`) forces JSON ahead of the TTY check — some agent harnesses attach a pty (ADR-023).
 
 ### `delete` requires `--force`
 Never silently delete. `force: false` → throw. Intentional data-loss protection.
@@ -97,6 +97,7 @@ src/
   config.ts           Profile CRUD (functions not constants)
   apps.ts             App registry — alias, modules, versions, KEY_FIELDS
   output.ts           Formatters — sparseDoc, stripMetaDoc, applyOutputFilters
+  agent-detect.ts     isAgentInvocation() — known agent env vars, forces JSON over TTY (ADR-023)
   mcp-server.ts       MCP stdio — 5 read-only + 3 mutation tools, --allow-mutations gate
   commands/
     auth.ts           OAuth PKCE login/logout/status
@@ -284,7 +285,7 @@ This file is dev context only.
 | `applyOutputFilters(doc, opts)` | strip-meta then sparse, both optional. |
 | `printDoc(doc, fmt, opts?)` | Single doc with output filters. |
 | `printDocs(docs, fmt, opts?)` | Doc list with output filters. |
-| `detectFormat(flag?)` | Resolve OutputFormat from flag or TTY. |
+| `detectFormat(flag?)` | Resolve OutputFormat: flag > agent env var > TTY (ADR-023). |
 
 ## Known Frappe Quirks
 
