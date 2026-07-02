@@ -77,6 +77,9 @@ Produces `{valid, required, missing, unknown}` on stdout on both pass AND fail. 
 ### `--enable-verbs` gate placement
 Checked after READONLY, before verb router. `isVerbAllowed()` exported as pure function for unit tests. Empty string blocks all verbs — intentional.
 
+### `--debug` never prints raw credentials
+`debugInfo()` in `cli.ts` — pure, exported function (ADR-024). Prints profile name/URL + which auth path is active, never `api_key`/`api_secret`/`access_token`/`refresh_token` values. Regression-tested in `cli.test.ts`. Constraint pre-set by ADR-020 before this flag existed. Main verb router only — not `mcp`/`auth`/`profile`.
+
 ### `--wait` only on `call` verb
 Detects `job_name` (string) in `callMethod` response. Calls `client.waitForJob`. `failed` → `call.ts` throws. `finished` → outputs `info.result`. No `job_name` → silent no-op.
 
