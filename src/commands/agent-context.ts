@@ -4,7 +4,9 @@ import { FrappeClient } from "../client.ts";
 // Bump when verbs, flags, or auth shape changes — agents use this to invalidate cached schemas
 const SCHEMA_VERSION = "3";
 
-const VERBS = [
+// Exported for skill-file.test.ts — single source of truth for the doc-scoped
+// verb set, cross-checked against frappe-ctl.skill.md's Verb Reference table.
+export const VERBS = [
   {
     name: "get",
     description: "List docs or fetch one by name",

@@ -33,6 +33,10 @@ import { saveToken } from "./token-store.ts";
 
 const VERSION = "0.2.0";
 
+// Canonical verb-router list — single source of truth cross-checked by
+// skill-file.test.ts against agent-context.ts::VERBS (ADR-025).
+export const CLI_VERBS = ["get", "count", "search", "describe", "link", "validate", "diff", "apply", "create", "patch", "delete", "bulk", "submit", "cancel", "call", "report", "resources", "logs", "workflow", "attach", "print", "agent-context"];
+
 export function isVerbAllowed(verb: string, enableVerbs: string | undefined): boolean {
   if (enableVerbs === undefined) return true;
   const allowed = enableVerbs.split(",").map((v) => v.trim()).filter(Boolean);
@@ -666,8 +670,7 @@ async function main(): Promise<void> {
     }
 
     default: {
-      const known = ["get", "count", "search", "describe", "link", "validate", "diff", "apply", "create", "patch", "delete", "bulk", "submit", "cancel", "call", "report", "resources", "logs", "workflow", "attach", "print", "agent-context"];
-      die(`Unknown verb '${args.verb}'. Valid verbs: ${known.join(", ")}`);
+      die(`Unknown verb '${args.verb}'. Valid verbs: ${CLI_VERBS.join(", ")}`);
     }
   }
 
