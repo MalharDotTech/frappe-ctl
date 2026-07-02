@@ -143,6 +143,7 @@ bun test src/commands/get.test.ts
 - Fixture format: `callMethod` → `{ message: <payload> }`, `listDocs`/`getDoc` → `{ data: <payload> }`
 - Multi-call verbs: chain `mockResolvedValueOnce` on same spy — don't call `spyOn` multiple times
 - `waitForJob` tests: `{ intervalMs: 0 }`. Timeout test: `mockResolvedValue` (not `Once`)
+- Credential-leak regression guard: `client.test.ts` asserts `apiKey`/`apiSecret` never appear in a thrown `FrappeRequestError`'s `message`/`serverMessage` across HTTP-error, network-failure, and malformed-JSON paths (ADR-020). Extend this test whenever a new error-construction path is added to `client.ts`.
 
 Every new verb: `*.test.ts` with happy path, flag behaviour, table + json output.
 
@@ -304,7 +305,8 @@ This file is dev context only.
 | OAuth per-site | No central IDP. Each site is its own OAuth server. client_id is per-site. |
 | PKCE S256 only | `code_challenge_methods_supported = ["S256"]`. Always use S256. |
 | Redirect URI | Must include port — `http://localhost:PORT`. Portless has Frappe bug. |
-| `FRAPPE_CTL_NO_KEYCHAIN=1` | File-only token storage. Required for CI/tests. |
+| `FRAPPE_CTL_NO_KEYCHAIN=1` | File-only token storage. Required for CI/tests. Deliberate opt-out — no stderr warning. |
+| Keychain write failure | Unexpected `security` failure (locked, denied) warns to stderr, falls back to file. Silent only on `FRAPPE_CTL_NO_KEYCHAIN=1`. See ADR-020 — does NOT give per-process ACL isolation (spike showed any process can read the item via `security` CLI directly). |
 | Silent token refresh | `cli.ts` auto-refreshes expired tokens. Falls back to api_key if refresh fails. |
 | `describe` JSON | Use `{ ...meta, fields }` not raw `meta` — bypasses all filter flags. |
 | `title_field` | Top-level on DocType object, not in `fields` array. Fall back to `TITLE_FIELD_FALLBACKS`. |
