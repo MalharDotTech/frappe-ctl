@@ -1,3 +1,5 @@
+import { isAgentInvocation } from "./agent-detect.ts";
+
 export type OutputFormat = "json" | "table" | "csv";
 
 const META_FIELDS = new Set([
@@ -46,6 +48,9 @@ export function detectFormat(flag?: string): OutputFormat {
   if (flag === "json") return "json";
   if (flag === "csv") return "csv";
   if (flag === "table") return "table";
+  // Some agent harnesses attach a pty, so isTTY alone can lie — an explicit
+  // agent env var overrides it (ADR-023).
+  if (isAgentInvocation()) return "json";
   return process.stdout.isTTY ? "table" : "json";
 }
 
