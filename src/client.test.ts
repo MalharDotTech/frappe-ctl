@@ -189,6 +189,55 @@ describe("FrappeClient — error handling", () => {
       expect((e as FrappeRequestError).statusCode).toBe(0);
     }
   });
+
+  // Regression guard: apiKey/apiSecret must never surface in an error an
+  // agent invoking frappe-ctl as a subprocess could see. Covers every path
+  // that constructs a FrappeRequestError message.
+  describe("never leaks credentials into error output", () => {
+    const assertNoLeak = (e: unknown) => {
+      expect(e).toBeInstanceOf(FrappeRequestError);
+      const err = e as FrappeRequestError;
+      for (const field of [err.message, err.serverMessage ?? ""]) {
+        expect(field).not.toContain(TEST_CONFIG.apiKey);
+        expect(field).not.toContain(TEST_CONFIG.apiSecret);
+        expect(field).not.toContain(`token ${TEST_CONFIG.apiKey}:${TEST_CONFIG.apiSecret}`);
+      }
+    };
+
+    it("on HTTP error response", async () => {
+      spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        new Response(JSON.stringify({ exc_type: "PermissionError", exception: "Not permitted" }), { status: 403 }),
+      );
+      try {
+        await makeClient().listDocs("User");
+        throw new Error("should have thrown");
+      } catch (e) {
+        assertNoLeak(e);
+      }
+    });
+
+    it("on network failure", async () => {
+      spyOn(globalThis, "fetch").mockRejectedValueOnce(new Error("ECONNREFUSED"));
+      try {
+        await makeClient().listDocs("User");
+        throw new Error("should have thrown");
+      } catch (e) {
+        assertNoLeak(e);
+      }
+    });
+
+    it("on malformed JSON response", async () => {
+      spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        new Response("not json", { status: 200, headers: { "Content-Type": "application/json" } }),
+      );
+      try {
+        await makeClient().listDocs("User");
+        throw new Error("should have thrown");
+      } catch (e) {
+        assertNoLeak(e);
+      }
+    });
+  });
 });
 
 describe("FrappeClient.waitForJob", () => {

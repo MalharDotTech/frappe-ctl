@@ -18,13 +18,15 @@ Core CLI capability — new verbs, flags, or behavior that change what the tool 
 - [ ] Conversation-history jsonl sorting + usage-stats collection (openspec-style) — **parked, scope undefined.** Not present in chctl; separate lineage. Needs a spec before sizing.
 
 ### Security
-Credential handling — the raw API key/secret and OAuth tokens must never be reachable by an agent's logs or context, only by `frappe-ctl` itself acting on the agent's behalf. Researched how comparable CLIs handle this (sources below); findings split into an urgent fix and a design direction.
+Credential handling — the raw API key/secret and OAuth tokens must never be reachable by an agent's logs or context, only by `frappe-ctl` itself acting on the agent's behalf. Researched how comparable CLIs handle this (sources below).
 
-- [ ] **Urgent fix** — `config.ts::saveConfig()` writes `api_key`/`api_secret` to `config.json` as **plaintext with no file-mode restriction** (no `0o600`, unlike `token-store.ts::saveFileStore()` which does set it). This is the `token key:secret` self-hosted auth path (ADR-001) — it currently has *zero* Keychain protection; only the OAuth token path attempts Keychain-first. Two gaps to close: (1) match `token-store.ts`'s `0o600` mode on `config.json` at minimum, (2) route `api_key`/`api_secret` through the same Keychain-first path OAuth tokens already use, so both auth modes get equal protection.
-- [ ] **Silent-fallback anti-pattern** — `token-store.ts::saveToken()` falls back to plaintext file store silently if the Keychain write fails, with no signal to the user. `gh` CLI shipped this exact bug (cli/cli#8954, #7757 — silently wrote plaintext even with keyring available) and had to walk it back with an explicit `--insecure-storage` opt-in flag, secure storage as the *default*. frappe-ctl should fail loud (or warn to stderr) on Keychain-write failure, not degrade silently.
-- [ ] **Keychain ACL trust scope** — current `security add-generic-password` call (`token-store.ts`) passes no `-T`/`-A` flag, so the trust boundary of who can read the secret *without* a macOS password prompt is currently undefined/untested, not deliberately scoped. This is the mechanism behind the gogcli macOS-password-prompt behavior: an item's ACL lists which specific app(s) get silent access; anything outside that list triggers an OS prompt. Need to explicitly test and pin down what `-T <path>` scopes to for a Bun script invoked via `bin/frappe-ctl` (unsigned scripts can't get codesign-based ACL trust the way a compiled binary can — this needs a spike, not an assumption).
-- [ ] **Headless/CI parity** — already have `FRAPPE_CTL_NO_KEYCHAIN=1` for file-only storage in CI, which matches the pattern gogcli uses (`GOG_KEYRING_BACKEND=file` + `GOG_KEYRING_PASSWORD` for non-interactive). No change needed here, just confirmed as the right shape.
-- [ ] New ADR once the above is resolved — no existing ADR documents the token-storage security model as a deliberate decision; it's currently implemented ad hoc.
+- [x] **`config.json` file-mode fix** — `saveConfig()` now writes `0o600`, matching `token-store.ts`. Merged in PR #2.
+- [x] **ACL trust-scope spike** — tested empirically: `security add-generic-password` (no `-T`/`-A`) gives **zero real process-scoping**. An item was read back silently, no prompt, from a completely unrelated fresh subshell — macOS trusts whichever process calls the Keychain API, always `/usr/bin/security` itself, not `frappe-ctl`. True per-process ACL scoping (the gogcli-style guarantee) needs a compiled+signed binary and native Security.framework calls — macOS-only, multi-week effort. **Decision: out of scope for now**, see ADR-020. If revisited later, it gets its own ADR and is scoped as a dedicated project, not folded into routine roadmap work.
+- [x] **Target redefined as code-level, not OS-level** — given the ACL spike result, the real guarantee to hold is: raw secrets never appear in anything `frappe-ctl` prints (stdout/stderr/errors/logs), regardless of which process reads the Keychain directly. A full audit confirmed this already held across the codebase — zero leak paths found. Formalized in ADR-020, with a regression test (`client.test.ts`) guarding it going forward.
+- [x] **Silent-fallback anti-pattern fixed** — `token-store.ts::saveToken()` now warns to stderr when a Keychain write fails for a reason other than deliberate opt-out (`FRAPPE_CTL_NO_KEYCHAIN=1`). `gh` CLI shipped this exact bug (cli/cli#8954, #7757) and had to walk it back; fixed proactively here instead.
+- [x] **Headless/CI parity confirmed** — `FRAPPE_CTL_NO_KEYCHAIN=1` matches the pattern gogcli uses (`GOG_KEYRING_BACKEND=file`) — no change needed, shape was already right.
+- [x] **ADR-020 written** — `docs/adr/20260703-020-credential-leak-boundary.md` — documents the code-level-vs-OS-level split, the spike result, the audit result, and constrains any future `--debug` flag to never print raw secret values.
+- [ ] **`api_key`/`api_secret` Keychain-routing** — downgraded from "urgent gap" to nice-to-have. Given the ACL spike proved Keychain doesn't add process-isolation value over a `0o600` file on a single-user machine, the main remaining benefit is at-rest encryption + parity with the OAuth token path. Not blocking; pick up opportunistically.
 
 **Research sources:**
 - [gogcli DeepWiki — Authentication & Security](https://deepwiki.com/steipete/gogcli/4-authentication-and-security) — uses `99designs/keyring` (Go), cross-platform (macOS Keychain / Linux Secret Service / Windows Credential Manager), key format `token:<client>:<email>`, `GOG_KEYRING_BACKEND={auto|keychain|file}` + `GOG_KEYRING_PASSWORD` for headless.
@@ -84,10 +86,10 @@ Visual and interaction polish. Deferred this cycle — not blocking release.
 
 ## Sequencing (this cycle)
 
-1. **Security urgent fix** — `config.ts` plaintext `api_key`/`api_secret` with no file-mode restriction. Moved ahead of everything else: it's a live gap, not a roadmap aspiration.
-2. Fixes — clear `cli.ts` mode-bit state, run ADR drift audit
-3. Security (remaining) — silent-fallback fix, Keychain ACL scoping spike, headless parity confirmation, new ADR
-4. Functional — `skills install` verb → exit code `4` → agent env-var detect → `--debug` flag
+1. ~~Security urgent fix — `config.ts` plaintext `api_key`/`api_secret` with no file-mode restriction~~ — done, PR #2
+2. ~~Fixes — clear `cli.ts` mode-bit state, run ADR drift audit~~ — done, PR #3
+3. ~~Security (remaining) — silent-fallback fix, Keychain ACL scoping spike, headless parity confirmation, new ADR~~ — done, see ADR-020
+4. **Functional** — `skills install` verb → exit code `4` → agent env-var detect → `--debug` flag *(next up)*
 5. Onboarding — confirm skill file freshness (falls out of step 4)
 6. Distribution — skills.sh push, `fctl` alias
 7. Community/OSS + Aesthetics — next cycle

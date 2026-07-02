@@ -52,7 +52,16 @@ function keychainSave(siteUrl: string, value: string): boolean {
     "-w", value,
     "-U",  // update if exists
   ]);
-  return result.exitCode === 0;
+  if (result.exitCode !== 0) {
+    // Keychain was attempted (not deliberately opted out) and failed — warn
+    // rather than silently degrade to a less-protected file store. Same
+    // failure mode gh CLI shipped and had to walk back (cli/cli#8954).
+    console.error(
+      "Warning: macOS Keychain write failed (locked or denied?) — falling back to file storage at ~/.config/frappe-ctl/tokens.json. Run with FRAPPE_CTL_NO_KEYCHAIN=1 to suppress this warning.",
+    );
+    return false;
+  }
+  return true;
 }
 
 function keychainLoad(siteUrl: string): string | null {
