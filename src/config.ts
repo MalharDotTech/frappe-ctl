@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
+import { AuthRequiredError } from "./errors.ts";
 
 export interface Profile {
   url: string;
@@ -44,13 +45,13 @@ function saveConfig(cfg: Config): void {
 export function getActiveProfile(cfg: Config, override?: string): Profile {
   const name = override ?? cfg.default;
   if (!name) {
-    throw new Error(
+    throw new AuthRequiredError(
       "No active profile. Run: frappe-ctl profile add <name> --url <url> --key <key> --secret <secret>",
     );
   }
   const profile = cfg.profiles[name];
   if (!profile) {
-    throw new Error(`Profile '${name}' not found. Run: frappe-ctl profile list`);
+    throw new AuthRequiredError(`Profile '${name}' not found. Run: frappe-ctl profile list`);
   }
   return profile;
 }

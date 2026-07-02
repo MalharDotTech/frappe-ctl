@@ -9,6 +9,7 @@ import {
   profileRemove,
   getActiveProfile,
 } from "./config.ts";
+import { AuthRequiredError } from "./errors.ts";
 
 // Each test gets an isolated temp dir — never touches ~/.config/frappe-ctl
 let tmpDir: string;
@@ -120,6 +121,16 @@ describe("getActiveProfile", () => {
   it("throws descriptive error when named profile missing", () => {
     profileAdd("uat", "http://localhost:8080", "k1", "s1");
     expect(() => getActiveProfile(loadConfig(), "ghost")).toThrow("not found");
+  });
+
+  // Distinct error type lets cli.ts map both cases to exit code 4 (ADR-022)
+  it("throws AuthRequiredError when no profile configured", () => {
+    expect(() => getActiveProfile(loadConfig())).toThrow(AuthRequiredError);
+  });
+
+  it("throws AuthRequiredError when named profile missing", () => {
+    profileAdd("uat", "http://localhost:8080", "k1", "s1");
+    expect(() => getActiveProfile(loadConfig(), "ghost")).toThrow(AuthRequiredError);
   });
 });
 

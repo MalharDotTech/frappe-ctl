@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 import { FrappeClient, FrappeRequestError } from "./client.ts";
+import { AuthRequiredError } from "./errors.ts";
 import { loadConfig, getActiveProfile, profileAdd, profileUse, profileList, profileRemove } from "./config.ts";
 import { resolveApp, APPS } from "./apps.ts";
 import { cmdGet, parseFilter } from "./commands/get.ts";
@@ -37,9 +38,19 @@ export function isVerbAllowed(verb: string, enableVerbs: string | undefined): bo
   return allowed.includes(verb);
 }
 
-function die(msg: string): never {
+// gh-style exit codes (ADR-022): 4 = auth required, distinct from generic 1.
+// Narrow on purpose — HTTP 403 stays exit 1 even when auth-related, since
+// Frappe also returns 403 for plain PermissionError with a valid session,
+// and misclassifying that as "re-auth needed" would mislead an agent.
+export function exitCodeFor(err: unknown): number {
+  if (err instanceof AuthRequiredError) return 4;
+  if (err instanceof FrappeRequestError && err.statusCode === 401) return 4;
+  return 1;
+}
+
+function die(msg: string, exitCode = 1): never {
   console.error(`error: ${msg}`);
-  process.exit(1);
+  process.exit(exitCode);
 }
 
 function usage(): void {
@@ -232,7 +243,7 @@ async function main(): Promise<void> {
     const cfg = loadConfig();
     let profile;
     try { profile = getActiveProfile(cfg, parsed.site); }
-    catch (e) { die((e as Error).message); }
+    catch (e) { die((e as Error).message, exitCodeFor(e)); }
     const mcpClient = new FrappeClient({ url: profile.url, apiKey: profile.api_key, apiSecret: profile.api_secret });
     await runMcpServer(mcpClient, { allowMutations });
     return;
@@ -357,7 +368,7 @@ async function main(): Promise<void> {
   try {
     profile = getActiveProfile(cfg, args.site);
   } catch (e) {
-    die((e as Error).message);
+    die((e as Error).message, exitCodeFor(e));
   }
 
   // Auth resolution — OAuth Bearer takes priority over api_key:secret (ADR-009)
@@ -652,5 +663,5 @@ main().catch((err: unknown) => {
   } else {
     console.error(`error: ${err instanceof Error ? err.message : String(err)}`);
   }
-  process.exit(1);
+  process.exit(exitCodeFor(err));
 });
