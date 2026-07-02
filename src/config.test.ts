@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { mkdirSync, rmSync } from "fs";
+import { mkdirSync, rmSync, statSync } from "fs";
 import { join } from "path";
 import {
   loadConfig,
@@ -29,6 +29,14 @@ describe("loadConfig", () => {
     const cfg = loadConfig();
     expect(cfg.default).toBe("");
     expect(cfg.profiles).toEqual({});
+  });
+});
+
+describe("profileAdd — file permissions", () => {
+  it("writes config.json as owner-only (0600) — api_key/api_secret are sensitive", () => {
+    profileAdd("uat", "http://localhost:8080", "key1", "secret1");
+    const mode = statSync(join(tmpDir, "config.json")).mode & 0o777;
+    expect(mode).toBe(0o600);
   });
 });
 
