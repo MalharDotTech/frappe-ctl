@@ -19,4 +19,4 @@ Intuitive API design would accept an array. Frappe's server-side filter parser e
 ## Consequences
 - ✅ Works correctly once known
 - ⚠️ Easy to regress — every caller building `in` filters must join with `,` not pass array
-- ⚠️ `FrappeFilter` type in `client.ts` uses `string | string[]` for the value — callers must join before passing
+- ✅ `FrappeFilter` type in `client.ts` now types the value as plain `string` (not `string | string[]`) — the type system itself forces callers to join before passing, closing the regression risk above
