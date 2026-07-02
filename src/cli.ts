@@ -22,6 +22,7 @@ import { cmdLink } from "./commands/link.ts";
 import { cmdValidate } from "./commands/validate.ts";
 import { cmdDiff } from "./commands/diff.ts";
 import { cmdAuthLogin, cmdAuthLogout, cmdAuthStatus } from "./commands/auth.ts";
+import { cmdSkillsInstall } from "./commands/skills.ts";
 import { runMcpServer } from "./mcp-server.ts";
 import { loadToken, isTokenExpired } from "./token-store.ts";
 import { refreshAccessToken } from "./oauth.ts";
@@ -131,6 +132,12 @@ MCP SERVER (STDIO)
   frappe-ctl mcp                                     # Read-only tools (frappe_get/count/search/describe/validate)
   frappe-ctl mcp --allow-mutations                   # Also exposes frappe_create/patch/delete
   frappe-ctl mcp --site prod                         # Use specific profile
+
+SKILLS (INSTALL AGENT CONTEXT)
+  frappe-ctl skills install                          # default: detected agent dirs only, project scope
+  frappe-ctl skills install --all                     # every supported agent dir
+  frappe-ctl skills install --agent claude --agent codex  # specific agents (repeatable)
+  frappe-ctl skills install --global                  # home dir instead of cwd
 `);
 }
 
@@ -144,11 +151,12 @@ interface ParsedArgs {
   flags: Record<string, string | true>;
   filters: string[];
   appVersions: string[];  // --app-version next=v16 (repeatable)
+  agents: string[];       // --agent claude (repeatable) — skills install
   dryRun: boolean;
 }
 
 function parseArgs(argv: string[]): ParsedArgs {
-  const result: ParsedArgs = { positional: [], flags: {}, filters: [], appVersions: [], dryRun: false };
+  const result: ParsedArgs = { positional: [], flags: {}, filters: [], appVersions: [], agents: [], dryRun: false };
   let i = 0;
 
   while (i < argv.length) {
@@ -164,6 +172,8 @@ function parseArgs(argv: string[]): ParsedArgs {
       result.dryRun = true;
     } else if (arg === "--app-version") {
       result.appVersions.push(argv[++i] ?? die("--app-version requires a value"));
+    } else if (arg === "--agent") {
+      result.agents.push(argv[++i] ?? die("--agent requires a value"));
     } else if (arg === "--fields") {
       result.flags["fields"] = argv[++i] ?? die("--fields requires a value");
     } else if (arg === "--limit" || arg === "-l") {
@@ -300,6 +310,25 @@ async function main(): Promise<void> {
         break;
       default:
         die(`Unknown profile command '${sub}'. Use: add, use, list, remove`);
+    }
+    return;
+  }
+
+  // skills sub-command — installs frappe-ctl.skill.md into agent-specific dirs, no site context needed
+  if (argv[0] === "skills") {
+    const sub = argv[1];
+    const parsed = parseArgs(argv.slice(2));
+    switch (sub) {
+      case "install":
+        cmdSkillsInstall({
+          agents: parsed.agents.length ? parsed.agents : undefined,
+          all: parsed.flags["all"] === true,
+          detectedOnly: parsed.flags["detected-only"] === true,
+          global: parsed.flags["global"] === true,
+        });
+        break;
+      default:
+        die(`Unknown skills command '${sub ?? ""}'. Valid: install\n\nExamples:\n  frappe-ctl skills install\n  frappe-ctl skills install --all\n  frappe-ctl skills install --agent claude --agent codex\n  frappe-ctl skills install --global`);
     }
     return;
   }
