@@ -14,7 +14,7 @@ Core CLI capability — new verbs, flags, or behavior that change what the tool 
 - [x] `skills install` verb — install `frappe-ctl.skill.md` into agent-specific dirs (`.claude/skills/`, `.codex/skills/`, `.cursor/skills/`, etc, 16 total + common `.agents/skills/`). Chctl-inspired. Non-interactive, `--detected-only` default — see ADR-021. Turns the skill file from a doc into a real distribution mechanism. Unblocks the skills.sh push.
 - [x] Exit code `4` = auth-required, distinct from generic `1`. Chctl-inspired, but scope narrowed after review — only `401` + missing/invalid local profile map to `4`; `403` deliberately stays `1` since Frappe also uses it for plain `PermissionError` with a valid session (see ADR-022). New `AuthRequiredError` type + `exitCodeFor()` pure function (`cli.ts`).
 - [x] Agent env-var auto-detect → force JSON output even when `process.stdout.isTTY` is true. Chctl-inspired. Env var list pulled from the real `is-ai-agent` crate source, not guessed (ADR-023). New `agent-detect.ts::isAgentInvocation()`, wired into `output.ts::detectFormat()` ahead of the TTY check.
-- [ ] `--debug` flag — print resolved profile/credential source + effective API URL to stderr before running. Chctl-inspired. Surfaces the config-precedence logic that already exists in `config.ts`.
+- [x] `--debug` flag — print resolved profile + auth source to stderr before running. Chctl-inspired. Never prints raw credentials — constraint pre-set by ADR-020, regression-tested (ADR-024). Main verb router only, not `mcp`/`auth`/`profile`.
 - [ ] Conversation-history jsonl sorting + usage-stats collection (openspec-style) — **parked, scope undefined.** Not present in chctl; separate lineage. Needs a spec before sizing.
 
 ### Security
@@ -56,8 +56,8 @@ First-run experience — what a new user or new agent sees before they've done a
 ### Fixes / Maintenance
 Housekeeping — clears drift and stale state before new work lands on top of it.
 
-- [ ] ADR drift audit — check current code against `docs/adr/` decisions, flag anything that's drifted.
-- [ ] Uncommitted `src/cli.ts` mode-bit change (100644→100755, no content diff) — resolve (commit or discard) before other work touches that file.
+- [x] ADR drift audit — 18/19 ADRs matched code exactly. One drift found (ADR-006's Consequences section described a stale `FrappeFilter` type) and fixed. PR #3.
+- [x] Uncommitted `src/cli.ts` mode-bit change (100644→100755, no content diff) — discarded, file is never executed directly (always `bun run src/cli.ts`).
 
 ### Aesthetics / UX-AX
 Visual and interaction polish. Deferred this cycle — not blocking release.
@@ -89,7 +89,7 @@ Visual and interaction polish. Deferred this cycle — not blocking release.
 1. ~~Security urgent fix — `config.ts` plaintext `api_key`/`api_secret` with no file-mode restriction~~ — done, PR #2
 2. ~~Fixes — clear `cli.ts` mode-bit state, run ADR drift audit~~ — done, PR #3
 3. ~~Security (remaining) — silent-fallback fix, Keychain ACL scoping spike, headless parity confirmation, new ADR~~ — done, see ADR-020
-4. **Functional** — `skills install` verb → exit code `4` → agent env-var detect → `--debug` flag *(next up)*
-5. Onboarding — confirm skill file freshness (falls out of step 4)
+4. ~~Functional — `skills install` verb → exit code `4` → agent env-var detect → `--debug` flag~~ — done. jsonl/stats item remains parked, scope undefined.
+5. **Onboarding** — confirm skill file freshness *(next up)*
 6. Distribution — skills.sh push, `fctl` alias
 7. Community/OSS + Aesthetics — next cycle

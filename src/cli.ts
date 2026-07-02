@@ -2,6 +2,7 @@
 import { FrappeClient, FrappeRequestError } from "./client.ts";
 import { AuthRequiredError } from "./errors.ts";
 import { loadConfig, getActiveProfile, profileAdd, profileUse, profileList, profileRemove } from "./config.ts";
+import type { Profile } from "./config.ts";
 import { resolveApp, APPS } from "./apps.ts";
 import { cmdGet, parseFilter } from "./commands/get.ts";
 import { cmdDescribe } from "./commands/describe.ts";
@@ -53,6 +54,19 @@ function die(msg: string, exitCode = 1): never {
   process.exit(exitCode);
 }
 
+// --debug output (ADR-024). MUST NEVER print a raw credential value — only
+// which source is in play. Constraint set by ADR-020's credential-leak
+// boundary; regression-tested in cli.test.ts.
+export function debugInfo(profileName: string, profile: Profile, activeToken: StoredToken | null): string[] {
+  const authLine = activeToken && !isTokenExpired(activeToken)
+    ? "auth: OAuth bearer token (frappe-ctl auth status for details)"
+    : "auth: api_key:api_secret from profile file (~/.config/frappe-ctl/config.json)";
+  return [
+    `[debug] profile: ${profileName} (${profile.url})`,
+    `[debug] ${authLine}`,
+  ];
+}
+
 function usage(): void {
   console.log(`frappe-ctl v${VERSION}
 
@@ -101,6 +115,7 @@ FLAGS
   --strip-meta                  Remove Frappe system fields (owner, creation, etc)
   -o, --output json|table|csv   Output format
   --enable-verbs <list>         Comma-separated allowlist of permitted verbs (e.g. get,describe,count)
+  --debug                       Print resolved profile + auth source to stderr (never prints raw credentials)
 
 ENV
   FRAPPE_CTL_READONLY=1         Block all mutations (safe for read-only agents)
@@ -392,6 +407,11 @@ async function main(): Promise<void> {
   const client = activeToken && !isTokenExpired(activeToken)
     ? new FrappeClient({ url: profile.url, bearerToken: activeToken.access_token })
     : new FrappeClient({ url: profile.url, apiKey: profile.api_key, apiSecret: profile.api_secret });
+
+  if (args.flags["debug"] === true) {
+    const profileName = args.site ?? cfg.default;
+    for (const line of debugInfo(profileName, profile, activeToken)) console.error(line);
+  }
 
   const MUTATION_VERBS = ["create", "patch", "delete", "submit", "cancel", "call", "apply", "workflow", "attach", "bulk"];
   const readonly = process.env["FRAPPE_CTL_READONLY"] === "1";
