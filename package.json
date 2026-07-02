@@ -4,7 +4,8 @@
   "description": "The missing CLI for Frappe/ERPNext. Built for humans and AI agents.",
   "type": "module",
   "bin": {
-    "frappe-ctl": "./bin/frappe-ctl"
+    "frappe-ctl": "./bin/frappe-ctl",
+    "fctl": "./bin/frappe-ctl"
   },
   "files": [
     "bin/",

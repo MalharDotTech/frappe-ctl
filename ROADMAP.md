@@ -37,7 +37,8 @@ Credential handling — the raw API key/secret and OAuth tokens must never be re
 ### Distribution
 Getting the tool into more hands, more channels.
 
-- [ ] `fctl` short alias — add second `bin` entry in `package.json` pointing at the same wrapper as `frappe-ctl`.
+- [x] `fctl` short alias — second `bin` entry in `package.json`. Note: an unrelated npm package already uses the `fctl` bin name (v0.0.1, near-zero installs) — proceeded anyway, collision risk judged negligible.
+- [x] **Bug found while verifying the alias, fixed in the same PR**: `npm install -g frappe-ctl` was broken for everyone — `bin/frappe-ctl`'s `dirname "$0"` doesn't resolve through npm's global-install symlink, so it looked for `src/cli.ts` in the wrong place. Verified against a real `npm pack` + global install, not just a manual symlink. See ADR-026. Zero test coverage existed for the bin wrapper before this — now regression-tested (`src/bin-wrapper.test.ts`). Worth a patch release once merged, since earlier releases shipped broken.
 - [ ] Push to skills.sh — depends on `skills install` verb + a freshness-checked skill file (see Onboarding).
 - [ ] Shell completions (bash/zsh/fish) — already tracked as Phase 3 in `CLAUDE.md`.
 - [ ] Binary releases via `bun build --compile` + GitHub Actions — already tracked as Phase 3 in `CLAUDE.md`.

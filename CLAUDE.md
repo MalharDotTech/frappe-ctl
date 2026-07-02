@@ -35,6 +35,9 @@ NOT `Bearer`, NOT `Basic`. Every transport layer uses this. See `src/client.ts` 
 
 ## Key Technical Decisions
 
+### `bin/frappe-ctl` resolves through symlinks (ADR-026)
+`npm install -g` always symlinks the bin into a separate global bin dir. `dirname "$0"` alone resolves relative to the symlink's own directory, not the real script's — breaks `src/cli.ts` lookup. Wrapper loops through symlinks manually; no `readlink -f` (GNU-only, macOS ships BSD `readlink`). Regression-tested in `src/bin-wrapper.test.ts` — this class of bug had zero test coverage before ADR-026, verify any future wrapper change against it.
+
 ### Versioning: `vX` only
 `v14`, `v15`, `v16` — major only. `vX.Y` is rejected.
 
@@ -96,6 +99,7 @@ Pass `{ intervalMs: 0 }` to skip sleep. Use `mockResolvedValue` (not `Once`) for
 ```
 src/
   cli.ts              Entry + arg parser
+  bin-wrapper.test.ts Regression test for bin/frappe-ctl symlink resolution (ADR-026)
   client.ts           All HTTP methods + waitForJob
   config.ts           Profile CRUD (functions not constants)
   apps.ts             App registry — alias, modules, versions, KEY_FIELDS
