@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "bun:test";
+import { describe, it, expect, beforeEach, afterEach, spyOn } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
@@ -95,6 +95,44 @@ describe("token-store (file fallback)", () => {
     const { statSync } = await import("fs");
     const mode = statSync(tokenFile).mode & 0o777;
     expect(mode).toBe(0o600);
+  });
+
+  it("warns to stderr when a Keychain write fails — not just when it's disabled", async () => {
+    // Distinct from FRAPPE_CTL_NO_KEYCHAIN=1 (deliberate opt-out, no warning needed):
+    // here Keychain is attempted but the `security` call itself fails
+    // (locked keychain, denied, etc). Silently degrading to plaintext file
+    // without telling the user is the exact anti-pattern gh CLI shipped
+    // (cli/cli#8954) — must fail loud instead.
+    delete process.env["FRAPPE_CTL_NO_KEYCHAIN"];
+    const origPlatform = process.platform;
+    Object.defineProperty(process, "platform", { value: "darwin" });
+    const spawnSpy = spyOn(Bun, "spawnSync").mockReturnValue({
+      exitCode: 1,
+      stdout: new Uint8Array(),
+      stderr: new Uint8Array(),
+    } as ReturnType<typeof Bun.spawnSync>);
+    const errSpy = spyOn(console, "error").mockImplementation(() => {});
+
+    const { saveToken, loadToken } = await store();
+    saveToken(siteUrl, sampleToken);
+
+    expect(errSpy).toHaveBeenCalled();
+    expect(errSpy.mock.calls[0]?.[0]).toContain("Keychain");
+    // Still recoverable — file fallback must still work despite the warning
+    expect(loadToken(siteUrl)).toEqual(sampleToken);
+
+    spawnSpy.mockRestore();
+    errSpy.mockRestore();
+    Object.defineProperty(process, "platform", { value: origPlatform });
+  });
+
+  it("does not warn when Keychain is deliberately disabled via env var", async () => {
+    // FRAPPE_CTL_NO_KEYCHAIN=1 is set in beforeEach — deliberate opt-out
+    const errSpy = spyOn(console, "error").mockImplementation(() => {});
+    const { saveToken } = await store();
+    saveToken(siteUrl, sampleToken);
+    expect(errSpy).not.toHaveBeenCalled();
+    errSpy.mockRestore();
   });
 });
 
