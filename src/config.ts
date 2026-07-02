@@ -37,7 +37,8 @@ export function loadConfig(): Config {
 
 function saveConfig(cfg: Config): void {
   if (!existsSync(configDir())) mkdirSync(configDir(), { recursive: true });
-  writeFileSync(configFile(), JSON.stringify(cfg, null, 2) + "\n", "utf8");
+  // 0o600 — owner read/write only. Profiles carry api_key/api_secret in plaintext.
+  writeFileSync(configFile(), JSON.stringify(cfg, null, 2) + "\n", { mode: 0o600, encoding: "utf8" });
 }
 
 export function getActiveProfile(cfg: Config, override?: string): Profile {
