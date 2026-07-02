@@ -119,6 +119,7 @@ src/
     report.ts         saved Report runner
     resources.ts      DocType lister per app
     agent-context.ts  static CLI schema + DocType-scoped compact schema
+    skills.ts         installs frappe-ctl.skill.md into agent-specific dirs (skills install)
   oauth.ts            PKCE helpers
   token-store.ts      macOS Keychain + file fallback (0o600)
   __fixtures__/       Shared mock responses

@@ -2,7 +2,7 @@ import { APPS, KEY_FIELDS } from "../apps.ts";
 import { FrappeClient } from "../client.ts";
 
 // Bump when verbs, flags, or auth shape changes — agents use this to invalidate cached schemas
-const SCHEMA_VERSION = "2";
+const SCHEMA_VERSION = "3";
 
 const VERBS = [
   {
@@ -214,6 +214,13 @@ export async function cmdAgentContext(opts: AgentContextArgs = {}): Promise<void
       "frappe-ctl auth login [--site <profile>] --client-id <id>   # PKCE browser flow, stores token",
       "frappe-ctl auth logout [--site <profile>]                    # revoke + delete local token",
       "frappe-ctl auth status [--site <profile>]                    # show token expiry + auth method",
+    ],
+    skills_commands: [
+      "frappe-ctl skills install                                    # default: detected agent dirs only, project scope",
+      "frappe-ctl skills install --all                               # every supported agent dir",
+      "frappe-ctl skills install --detected-only                     # explicit form of the default",
+      "frappe-ctl skills install --agent claude --agent codex         # specific agents (repeatable)",
+      "frappe-ctl skills install --global                            # home dir instead of cwd",
     ],
   };
 

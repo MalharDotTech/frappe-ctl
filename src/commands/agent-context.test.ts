@@ -83,9 +83,16 @@ describe("cmdAgentContext", () => {
     }
   });
 
-  it("schema_version is '2' (bumped after auth + bulk verbs added)", async () => {
+  it("schema_version is '3' (bumped after skills_commands added)", async () => {
     const parsed = await getContext() as { schema_version: string };
-    expect(parsed.schema_version).toBe("2");
+    expect(parsed.schema_version).toBe("3");
+  });
+
+  it("skills_commands documents the skills install verb", async () => {
+    const parsed = await getContext() as { skills_commands: string[] };
+    expect(parsed.skills_commands.some((c) => c.includes("skills install"))).toBe(true);
+    expect(parsed.skills_commands.some((c) => c.includes("--all"))).toBe(true);
+    expect(parsed.skills_commands.some((c) => c.includes("--agent"))).toBe(true);
   });
 
   it("auth field documents both self-hosted and OAuth paths", async () => {
