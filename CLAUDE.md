@@ -122,6 +122,7 @@ src/
     skills.ts         installs frappe-ctl.skill.md into agent-specific dirs (skills install)
   oauth.ts            PKCE helpers
   token-store.ts      macOS Keychain + file fallback (0o600)
+  errors.ts           AuthRequiredError — maps to exit code 4 (ADR-022)
   __fixtures__/       Shared mock responses
 ```
 
@@ -212,7 +213,7 @@ Sections: `## Decision` (1 sentence) · `## Context` · `## Consequences` (✅ p
 | Non-interactive | No prompts. `--force` for destructive ops. |
 | JSON stdout piped | `process.stdout.isTTY` on every command |
 | Stderr/stdout split | `die()` → stderr, data → stdout |
-| Exit codes | 0 = success, 1 = error/validation failure |
+| Exit codes | 0 = success, 1 = error/validation failure, 4 = auth required (no profile, or HTTP 401 — NOT 403, see ADR-022) |
 | Named profiles | `profile add/use/list/remove` + `--site` |
 | Sandboxed config | `FRAPPE_CTL_CONFIG_DIR` |
 | Bounded responses | Default `--limit 20` on `get` and `search` |

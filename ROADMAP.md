@@ -12,7 +12,7 @@ Current release cycle leads with **Functional** — the tool should get material
 Core CLI capability — new verbs, flags, or behavior that change what the tool can do.
 
 - [x] `skills install` verb — install `frappe-ctl.skill.md` into agent-specific dirs (`.claude/skills/`, `.codex/skills/`, `.cursor/skills/`, etc, 16 total + common `.agents/skills/`). Chctl-inspired. Non-interactive, `--detected-only` default — see ADR-021. Turns the skill file from a doc into a real distribution mechanism. Unblocks the skills.sh push.
-- [ ] Exit code `4` = auth-required, distinct from generic `1`. Chctl-inspired. Lets agents branch "need to re-auth" vs "generic failure" without parsing stderr text. Needs a typed error path in `client.ts` (currently flat `die()`).
+- [x] Exit code `4` = auth-required, distinct from generic `1`. Chctl-inspired, but scope narrowed after review — only `401` + missing/invalid local profile map to `4`; `403` deliberately stays `1` since Frappe also uses it for plain `PermissionError` with a valid session (see ADR-022). New `AuthRequiredError` type + `exitCodeFor()` pure function (`cli.ts`).
 - [ ] Agent env-var auto-detect → force JSON output even when `process.stdout.isTTY` is true. Chctl-inspired. Some agent harnesses attach a pty, so TTY-only detection can silently ship table output to an agent.
 - [ ] `--debug` flag — print resolved profile/credential source + effective API URL to stderr before running. Chctl-inspired. Surfaces the config-precedence logic that already exists in `config.ts`.
 - [ ] Conversation-history jsonl sorting + usage-stats collection (openspec-style) — **parked, scope undefined.** Not present in chctl; separate lineage. Needs a spec before sizing.
