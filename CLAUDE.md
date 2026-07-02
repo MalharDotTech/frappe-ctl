@@ -186,7 +186,7 @@ title: ""
 date: YYYY-MM-DD
 status: accepted
 frappe_version: "v16"
-frappe_ctl_version: "0.2.0"
+frappe_ctl_version: "0.3.0"
 tags: []
 ---
 ```
