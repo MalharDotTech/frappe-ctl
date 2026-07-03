@@ -38,6 +38,9 @@ NOT `Bearer`, NOT `Basic`. Every transport layer uses this. See `src/client.ts` 
 ### `bin/frappe-ctl` resolves through symlinks (ADR-026)
 `npm install -g` always symlinks the bin into a separate global bin dir. `dirname "$0"` alone resolves relative to the symlink's own directory, not the real script's — breaks `src/cli.ts` lookup. Wrapper loops through symlinks manually; no `readlink -f` (GNU-only, macOS ships BSD `readlink`). Regression-tested in `src/bin-wrapper.test.ts` — this class of bug had zero test coverage before ADR-026, verify any future wrapper change against it.
 
+### `SKILL.md` vs `frappe-ctl.skill.md` (ADR-027)
+Two files, same operational content. `frappe-ctl.skill.md` is canonical (what `skills install` ships, ADR-021). `SKILL.md` exists solely because skills.sh's discovery requires that exact filename + YAML frontmatter (`name`/`description`) — a naming convention frappe-ctl.skill.md predates and doesn't follow. `skill-file.test.ts` enforces `SKILL.md`'s body stays byte-identical to `frappe-ctl.skill.md`. Edit both, never just one.
+
 ### Versioning: `vX` only
 `v14`, `v15`, `v16` — major only. `vX.Y` is rejected.
 
@@ -131,7 +134,7 @@ src/
   oauth.ts            PKCE helpers
   token-store.ts      macOS Keychain + file fallback (0o600)
   errors.ts           AuthRequiredError — maps to exit code 4 (ADR-022)
-  skill-file.test.ts  frappe-ctl.skill.md verb freshness vs CLI_VERBS/VERBS (ADR-025)
+  skill-file.test.ts  frappe-ctl.skill.md verb freshness vs CLI_VERBS/VERBS (ADR-025); SKILL.md byte-identity guard (ADR-027)
   __fixtures__/       Shared mock responses
 ```
 
@@ -167,7 +170,7 @@ Every new verb: `*.test.ts` with happy path, flag behaviour, table + json output
 3. Add fixtures to `src/__fixtures__/api-responses.ts`
 4. Wire into `cli.ts` verb router (`switch (args.verb)`)
 5. Add to `usage()` in `cli.ts`
-6. Add to `CLI_VERBS` in `cli.ts` AND `VERBS` in `src/commands/agent-context.ts` AND the Verb Reference table in `frappe-ctl.skill.md` — `skill-file.test.ts` fails the build if any one of these three falls out of sync (ADR-025)
+6. Add to `CLI_VERBS` in `cli.ts` AND `VERBS` in `src/commands/agent-context.ts` AND the Verb Reference table in `frappe-ctl.skill.md` — `skill-file.test.ts` fails the build if any one of these three falls out of sync (ADR-025). If editing `frappe-ctl.skill.md`'s body at all, mirror the exact change into `SKILL.md` (byte-identical body required, ADR-027) — same test enforces this too.
 7. Update CLAUDE.md file layout
 8. Non-obvious choice → ADR
 

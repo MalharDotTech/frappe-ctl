@@ -55,3 +55,23 @@ describe("agent-context.ts VERBS — matches cli.ts's actual verb router", () =>
     expect(extra).toEqual([]);
   });
 });
+
+// SKILL.md exists solely for skills.sh discovery (ADR-027) — its ecosystem
+// requires that exact filename + YAML frontmatter, which conflicts with our
+// own frappe-ctl.skill.md naming convention (ADR-021). Rather than choosing
+// one name, both exist; this guards them from ever drifting apart, since
+// skills.sh's CLI copies SKILL.md's body verbatim and would silently serve
+// stale content otherwise.
+describe("SKILL.md — stays byte-identical to frappe-ctl.skill.md", () => {
+  it("has YAML frontmatter with name and description", () => {
+    const content = readFileSync(join(import.meta.dir, "..", "SKILL.md"), "utf8");
+    expect(content).toMatch(/^---\nname: frappe-ctl\ndescription: .+\n---\n/);
+  });
+
+  it("body (everything after frontmatter) matches frappe-ctl.skill.md exactly", () => {
+    const skillMd = readFileSync(join(import.meta.dir, "..", "SKILL.md"), "utf8");
+    const canonical = readFileSync(join(import.meta.dir, "..", "frappe-ctl.skill.md"), "utf8");
+    const body = skillMd.replace(/^---\n[\s\S]*?\n---\n/, "");
+    expect(body).toBe(canonical);
+  });
+});
