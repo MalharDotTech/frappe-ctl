@@ -15,6 +15,7 @@ Core CLI capability — new verbs, flags, or behavior that change what the tool 
 - [x] Exit code `4` = auth-required, distinct from generic `1`. Chctl-inspired, but scope narrowed after review — only `401` + missing/invalid local profile map to `4`; `403` deliberately stays `1` since Frappe also uses it for plain `PermissionError` with a valid session (see ADR-022). New `AuthRequiredError` type + `exitCodeFor()` pure function (`cli.ts`).
 - [x] Agent env-var auto-detect → force JSON output even when `process.stdout.isTTY` is true. Chctl-inspired. Env var list pulled from the real `is-ai-agent` crate source, not guessed (ADR-023). New `agent-detect.ts::isAgentInvocation()`, wired into `output.ts::detectFormat()` ahead of the TTY check.
 - [x] `--debug` flag — print resolved profile + auth source to stderr before running. Chctl-inspired. Never prints raw credentials — constraint pre-set by ADR-020, regression-tested (ADR-024). Main verb router only, not `mcp`/`auth`/`profile`.
+- [ ] **Directory-wide dependency-ordered idempotent `apply`/`diff`/`status`** — from a v-next design draft evaluation (2026-07-03, see below). Current `apply` is single-doc; this would be `frappe-ctl next apply ./project --site uat` applying a whole directory tree in dependency order, idempotently, with `diff`/`status` reflecting migration state. Still REST-only, still ACL-respecting, still fits the locked `<app> <verb>` grammar (ADR-002) — doesn't touch bench-scope (ADR-010). Large feature (dependency graph, state tracking, idempotency semantics) — not scoped down to an estimate yet, needs its own design pass before starting.
 - [ ] Prompt→command→output usage analysis — **scoped, deliberately parked until real external usage exists.** Real intent (clarified 2026-07-03): capture the full loop — user's English prompt, the agent's resulting `frappe-ctl` invocation, and its output — to drive future feature/token-efficiency decisions from real usage, not guesswork. Structurally, `frappe-ctl` itself can't capture this: it only ever sees its own argv, never the prompt that led to it — that data lives in the calling agent's own session transcripts, not in anything frappe-ctl could log about itself. Confirmed feasible for Claude Code specifically — its session `.jsonl` transcripts (e.g. `~/.claude/projects/<project>/*.jsonl`) do contain `tool_use` blocks with `name: "Bash"` and `input.command` holding exact `frappe-ctl` invocations, correlated with the preceding prompt and result. Real costs found before committing to build: Claude-Code-only (Cursor/Codex/other agents persist transcripts differently or not at all), the schema is undocumented/unstable (not a published API), and privacy filtering is real work (session files carry unrelated conversations + real business data from genuine usage, e.g. actual Customer names). Decision: not worth building now — almost all current "usage" is this dev session building the tool itself, which would make any analysis circular. Revisit once frappe-ctl has actual third-party users generating volume worth analyzing. If/when revisited: a separate dev-only script (e.g. `scripts/analyze-usage.ts`), never shipped in the npm package — bundling "read Claude Code's full conversation history" into a public CLI would be a real privacy/scope problem for any other installer.
 
 ### Security
@@ -43,6 +44,7 @@ Getting the tool into more hands, more channels.
 - [ ] Push to skills.sh — depends on `skills install` verb + a freshness-checked skill file (see Onboarding), both done. Not yet actioned.
 - [ ] Shell completions (bash/zsh/fish) — already tracked as Phase 3 in `CLAUDE.md`.
 - [ ] Binary releases via `bun build --compile` + GitHub Actions — already tracked as Phase 3 in `CLAUDE.md`.
+- [ ] `curl -fsSL <url> | sh` one-liner install — from the v-next design draft evaluation (2026-07-03, see below). No conflict with anything locked; purely additive alongside the existing bun/npm install paths. Needs binary releases (line above) or a fetchable script first — low priority until that lands.
 
 ### Community / OSS Governance
 Repo-as-project infrastructure, not code.
@@ -83,6 +85,23 @@ Visual and interaction polish. Deferred this cycle — not blocking release.
 - Local server lifecycle, cloud service CRUD, ClickPipes — no analog, ClickHouse-domain-specific.
 
 **Not found in chctl at all:** nothing resembling jsonl conversation-history sorting or openspec-style usage-stats collection. That item's source is separate from chctl and still needs its own spec.
+
+---
+
+## v-next design draft evaluation (2026-07-03)
+
+A separately-written design draft ("frappectl v-next") proposed a `<domain> <resource> <verb>` grammar with parallel `local`/`cloud` domains, `local site create`/`local app install`/`local site shell` provisioning commands, an `init` scaffolding convention (`doctypes/`, `fixtures/`, `patches/`, `queries/` folders), declarative payload flags, and directory-wide idempotent `apply`/`diff`/`status` as "the moat" against clickhousectl.
+
+**Direct conflict with two locked ADRs, decision: leave both locked, don't implement the conflicting parts.**
+- `local site create`/`app install`/`site shell` are exactly `bench new-site`/`bench install-app`/SSH access — all explicitly named and rejected in [ADR-010](docs/adr/20260610-010-bench-out-of-scope.md), with real reasoning already worked through (credential models don't unify across self-hosted bench vs Frappe Cloud API vs Cloud Press API; bypasses Frappe ACL; unsafe on managed infra where the update pipeline can overwrite bench changes).
+- The `<domain> <resource> <verb>` grammar itself replaces the locked `<app> <verb> <DocType>` shape from [ADR-002](docs/adr/20260610-002-kubectl-grammar.md).
+- `init` scaffolding (local files as source of truth for DocTypes/fixtures/patches, synced to Frappe) presupposes a fundamentally different tool shape — local-first IaC-style, not a REST data-ops client. Bigger pivot than a feature add; not pursued.
+
+**Already done, independent of the conflict:** ship-skills-with-binary (`skills install`), declarative payload flags (`--data`/`apply` already cover the substance), output-returns-what's-next (already true — Frappe's REST API returns the full doc on create), stateless/self-contained (already the architecture).
+
+**Cherry-picked as genuinely new and non-conflicting** (added to buckets above): directory-wide dependency-ordered idempotent `apply`/`diff`/`status` (Functional) — still REST-only, still ACL-respecting, still fits the locked grammar; `curl | sh` one-liner install (Distribution) — purely additive alongside existing bun/npm paths.
+
+**Noted for later, not contradicted:** the draft's `cloud` domain isn't actually rejected by ADR-010 — its own Consequences section already anticipates "if Cloud API integration is added later, it should be a separate `frappe-ctl cloud` subcommand with a distinct Press token credential, not mixed into the per-site profile system." If a cloud subcommand is ever built, that's the shape to build it in.
 
 ---
 
