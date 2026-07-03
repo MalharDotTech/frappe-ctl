@@ -4,7 +4,7 @@ title: "skills install verb — non-interactive, detected-only default"
 date: 2026-07-03
 status: accepted
 frappe_version: "v16"
-frappe_ctl_version: "0.2.0"
+frappe_ctl_version: "0.3.0"
 tags: [skills, distribution, agent-native, chctl-inspired]
 ---
 
