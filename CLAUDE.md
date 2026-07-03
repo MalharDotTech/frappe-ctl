@@ -38,8 +38,8 @@ NOT `Bearer`, NOT `Basic`. Every transport layer uses this. See `src/client.ts` 
 ### `bin/frappe-ctl` resolves through symlinks (ADR-026)
 `npm install -g` always symlinks the bin into a separate global bin dir. `dirname "$0"` alone resolves relative to the symlink's own directory, not the real script's — breaks `src/cli.ts` lookup. Wrapper loops through symlinks manually; no `readlink -f` (GNU-only, macOS ships BSD `readlink`). Regression-tested in `src/bin-wrapper.test.ts` — this class of bug had zero test coverage before ADR-026, verify any future wrapper change against it.
 
-### `SKILL.md` vs `frappe-ctl.skill.md` (ADR-027)
-Two files, same operational content. `frappe-ctl.skill.md` is canonical (what `skills install` ships, ADR-021). `SKILL.md` exists solely because skills.sh's discovery requires that exact filename + YAML frontmatter (`name`/`description`) — a naming convention frappe-ctl.skill.md predates and doesn't follow. `skill-file.test.ts` enforces `SKILL.md`'s body stays byte-identical to `frappe-ctl.skill.md`. Edit both, never just one.
+### `SKILL.md` is the single canonical skill file (ADR-027)
+Repo root carries `SKILL.md` — YAML frontmatter (`name`/`description`, required by skills.sh discovery) + the full operator reference as its body. `skills install` reads this file and strips the frontmatter before writing installed copies, which keep the `frappe-ctl.skill.md` name deliberately (agent skill dirs are shared across tools; a generic `SKILL.md` installed flat there would collide with any other tool's own file). One source of truth — edit `SKILL.md`, installed copies regenerate correctly on next `skills install` run.
 
 ### Versioning: `vX` only
 `v14`, `v15`, `v16` — major only. `vX.Y` is rejected.
@@ -130,11 +130,11 @@ src/
     report.ts         saved Report runner
     resources.ts      DocType lister per app
     agent-context.ts  static CLI schema + DocType-scoped compact schema
-    skills.ts         installs frappe-ctl.skill.md into agent-specific dirs (skills install)
+    skills.ts         reads SKILL.md, strips frontmatter, installs as frappe-ctl.skill.md in agent-specific dirs (skills install, ADR-027)
   oauth.ts            PKCE helpers
   token-store.ts      macOS Keychain + file fallback (0o600)
   errors.ts           AuthRequiredError — maps to exit code 4 (ADR-022)
-  skill-file.test.ts  frappe-ctl.skill.md verb freshness vs CLI_VERBS/VERBS (ADR-025); SKILL.md byte-identity guard (ADR-027)
+  skill-file.test.ts  SKILL.md verb freshness vs CLI_VERBS/VERBS (ADR-025) + frontmatter shape (ADR-027)
   __fixtures__/       Shared mock responses
 ```
 
@@ -170,7 +170,7 @@ Every new verb: `*.test.ts` with happy path, flag behaviour, table + json output
 3. Add fixtures to `src/__fixtures__/api-responses.ts`
 4. Wire into `cli.ts` verb router (`switch (args.verb)`)
 5. Add to `usage()` in `cli.ts`
-6. Add to `CLI_VERBS` in `cli.ts` AND `VERBS` in `src/commands/agent-context.ts` AND the Verb Reference table in `frappe-ctl.skill.md` — `skill-file.test.ts` fails the build if any one of these three falls out of sync (ADR-025). If editing `frappe-ctl.skill.md`'s body at all, mirror the exact change into `SKILL.md` (byte-identical body required, ADR-027) — same test enforces this too.
+6. Add to `CLI_VERBS` in `cli.ts` AND `VERBS` in `src/commands/agent-context.ts` AND the Verb Reference table in `SKILL.md` — `skill-file.test.ts` fails the build if any one of these three falls out of sync (ADR-025)
 7. Update CLAUDE.md file layout
 8. Non-obvious choice → ADR
 
@@ -259,7 +259,7 @@ Sections: `## Decision` (1 sentence) · `## Context` · `## Consequences` (✅ p
 
 ## Operator Agent Context
 
-**Not in this file.** Operator patterns, token rules, safety, output parsing, MCP setup → `frappe-ctl.skill.md`.
+**Not in this file.** Operator patterns, token rules, safety, output parsing, MCP setup → `SKILL.md`.
 
 This file is dev context only.
 

@@ -4,13 +4,14 @@ import { join } from "path";
 import { VERBS } from "./commands/agent-context.ts";
 import { CLI_VERBS } from "./cli.ts";
 
-// frappe-ctl.skill.md is what `skills install` distributes to AI agents
-// (ADR-021) — it must never fall behind the real verb set. "Fresh" means no
-// verb missing or renamed; flags/examples stay curated, not exhaustive
-// (ADR-025) — a skill file that mirrors --help 1:1 defeats its own
-// token-efficiency purpose.
+// SKILL.md (repo root) is the single canonical skill file — carries YAML
+// frontmatter for skills.sh discovery (ADR-027) and is what `skills install`
+// distributes to AI agents, frontmatter stripped (ADR-021). It must never
+// fall behind the real verb set. "Fresh" means no verb missing or renamed;
+// flags/examples stay curated, not exhaustive (ADR-025) — a skill file that
+// mirrors --help 1:1 defeats its own token-efficiency purpose.
 function skillFileVerbs(): Set<string> {
-  const content = readFileSync(join(import.meta.dir, "..", "frappe-ctl.skill.md"), "utf8");
+  const content = readFileSync(join(import.meta.dir, "..", "SKILL.md"), "utf8");
   const section = content.split("## Verb Reference")[1]?.split("## Token Efficiency")[0] ?? "";
   const verbs = new Set<string>();
   for (const match of section.matchAll(/^\| `([a-z-]+)` \|/gm)) {
@@ -23,7 +24,7 @@ function skillFileVerbs(): Set<string> {
 // skill file's same table) is expected alongside every VERBS entry.
 const EXPECTED_VERBS = new Set([...VERBS.map((v) => v.name), "agent-context"]);
 
-describe("frappe-ctl.skill.md — verb freshness", () => {
+describe("SKILL.md — verb freshness", () => {
   it("documents every verb the CLI actually has", () => {
     const documented = skillFileVerbs();
     const missing = [...EXPECTED_VERBS].filter((v) => !documented.has(v));
@@ -39,6 +40,11 @@ describe("frappe-ctl.skill.md — verb freshness", () => {
   it("finds at least one verb — guards against the extraction itself silently matching nothing", () => {
     expect(skillFileVerbs().size).toBeGreaterThan(0);
   });
+
+  it("has YAML frontmatter with name and description (required by skills.sh, ADR-027)", () => {
+    const content = readFileSync(join(import.meta.dir, "..", "SKILL.md"), "utf8");
+    expect(content).toMatch(/^---\nname: frappe-ctl\ndescription: .+\n---\n/);
+  });
 });
 
 // Closes the chain: agent-context.ts::VERBS is what skill-file freshness is
@@ -53,25 +59,5 @@ describe("agent-context.ts VERBS — matches cli.ts's actual verb router", () =>
   it("has no extra verb CLI_VERBS doesn't recognize", () => {
     const extra = CLI_VERBS.filter((v) => !EXPECTED_VERBS.has(v));
     expect(extra).toEqual([]);
-  });
-});
-
-// SKILL.md exists solely for skills.sh discovery (ADR-027) — its ecosystem
-// requires that exact filename + YAML frontmatter, which conflicts with our
-// own frappe-ctl.skill.md naming convention (ADR-021). Rather than choosing
-// one name, both exist; this guards them from ever drifting apart, since
-// skills.sh's CLI copies SKILL.md's body verbatim and would silently serve
-// stale content otherwise.
-describe("SKILL.md — stays byte-identical to frappe-ctl.skill.md", () => {
-  it("has YAML frontmatter with name and description", () => {
-    const content = readFileSync(join(import.meta.dir, "..", "SKILL.md"), "utf8");
-    expect(content).toMatch(/^---\nname: frappe-ctl\ndescription: .+\n---\n/);
-  });
-
-  it("body (everything after frontmatter) matches frappe-ctl.skill.md exactly", () => {
-    const skillMd = readFileSync(join(import.meta.dir, "..", "SKILL.md"), "utf8");
-    const canonical = readFileSync(join(import.meta.dir, "..", "frappe-ctl.skill.md"), "utf8");
-    const body = skillMd.replace(/^---\n[\s\S]*?\n---\n/, "");
-    expect(body).toBe(canonical);
   });
 });

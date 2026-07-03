@@ -21,6 +21,13 @@ function installed(root: string, relPath: string): boolean {
   return existsSync(join(root, relPath, "frappe-ctl.skill.md"));
 }
 
+// SKILL.md (canonical source, ADR-027) carries YAML frontmatter that
+// installed copies deliberately don't — strip it the same way skills.ts does.
+function canonicalInstalledContent(): string {
+  const raw = readFileSync(join(import.meta.dir, "..", "..", "SKILL.md"), "utf8");
+  return raw.replace(/^---\n[\s\S]*?\n---\n/, "");
+}
+
 describe("cmdSkillsInstall — --all", () => {
   it("installs into every supported agent path plus the common path", () => {
     cmdSkillsInstall({ all: true, cwd, home });
@@ -30,11 +37,10 @@ describe("cmdSkillsInstall — --all", () => {
     expect(installed(cwd, COMMON_SKILL_PATH)).toBe(true);
   });
 
-  it("writes content identical to the source skill file", () => {
+  it("writes content identical to SKILL.md with frontmatter stripped", () => {
     cmdSkillsInstall({ all: true, cwd, home });
-    const source = readFileSync(join(import.meta.dir, "..", "..", "frappe-ctl.skill.md"), "utf8");
     const written = readFileSync(join(cwd, SKILL_AGENT_PATHS["claude"]!, "frappe-ctl.skill.md"), "utf8");
-    expect(written).toBe(source);
+    expect(written).toBe(canonicalInstalledContent());
   });
 });
 
@@ -102,7 +108,6 @@ describe("cmdSkillsInstall — idempotency", () => {
     mkdirSync(join(cwd, SKILL_AGENT_PATHS["claude"]!), { recursive: true });
     writeFileSync(target, "stale content", "utf8");
     cmdSkillsInstall({ agents: ["claude"], cwd, home });
-    const source = readFileSync(join(import.meta.dir, "..", "..", "frappe-ctl.skill.md"), "utf8");
-    expect(readFileSync(target, "utf8")).toBe(source);
+    expect(readFileSync(target, "utf8")).toBe(canonicalInstalledContent());
   });
 });

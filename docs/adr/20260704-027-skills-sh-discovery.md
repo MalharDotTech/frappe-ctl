@@ -1,6 +1,6 @@
 ---
 adr: "027"
-title: "SKILL.md added for skills.sh discovery, kept in lockstep with frappe-ctl.skill.md"
+title: "SKILL.md is the single canonical skill file, frontmatter stripped on install"
 date: 2026-07-04
 status: accepted
 frappe_version: "v16"
@@ -8,25 +8,26 @@ frappe_ctl_version: "0.3.0"
 tags: [skills, distribution, skills-sh]
 ---
 
-# ADR-027: `SKILL.md` at repo root for skills.sh discovery
+# ADR-027: `SKILL.md` is the single canonical skill file
 
 ## Decision
-Repo root carries a second file, `SKILL.md`, with YAML frontmatter (`name: frappe-ctl`, `description: ...`) whose body is byte-identical to `frappe-ctl.skill.md`. A test (`skill-file.test.ts`) enforces that identity so the two files can never silently drift apart.
+Repo root carries exactly one skill file, `SKILL.md`, with YAML frontmatter (`name: frappe-ctl`, `description: ...`) followed by the full operator reference as its body. `skills install` reads this file, strips the frontmatter, and writes the result as `frappe-ctl.skill.md` into each installed agent directory. `frappe-ctl.skill.md` never exists as a checked-in file — only as a generated, install-time copy.
 
 ## Context
-Investigated what "push to frappe-ctl to skills.sh" (`ROADMAP.md` Distribution bucket) actually requires. Finding: skills.sh has no submission/approval process at all — its `npx skills add <owner>/<repo>` CLI (github.com/vercel-labs/skills) pulls directly from any public git repo. There is nothing to "push"; the only requirement is that the repo be discoverable in the shape their CLI expects.
+Investigated what "push to frappe-ctl to skills.sh" (`ROADMAP.md` Distribution bucket) actually requires. Finding: skills.sh has no submission process — its `npx skills add <owner>/<repo>` CLI (github.com/vercel-labs/skills) pulls directly from any public git repo. The only requirement is discoverability in the shape their CLI expects: a file literally named `SKILL.md` with YAML frontmatter, found at repo root or under `skills/<name>/`.
 
-That shape is specific: "Skills are directories containing a `SKILL.md` file with YAML frontmatter" containing required `name` and `description` fields. Discovery checks the repo root first, then a fixed list of `skills/` and agent-specific subdirectories. Our existing `frappe-ctl.skill.md` — deliberately named that way per ADR-021, shipped by our own `skills install` verb, tested by `skill-file.test.ts` — satisfies none of this: wrong filename (case-sensitive `SKILL.md` required), no frontmatter.
+The repo previously shipped `frappe-ctl.skill.md` — deliberately named that way (superseded reasoning below), no frontmatter — which satisfied none of that. First pass at fixing this (superseded by this ADR) added a second file, `SKILL.md`, kept byte-identical to `frappe-ctl.skill.md` via a test. That was wrong: it's pure duplication for no reason once you separate two things that don't actually need to be coupled — the *canonical source* of the content, and the *filename installed into shared agent directories*.
 
-Renaming `frappe-ctl.skill.md` to `SKILL.md` was rejected: it's referenced throughout the codebase (`skills.ts`'s `SKILL_FILE_NAME` constant), CLAUDE.md, README, the skill-file freshness tests, and every ADR from 021 onward. Changing it to satisfy one external ecosystem's naming convention would be a larger, riskier change for no functional gain over adding a second, purpose-built file.
+The real constraint was never "the source file must be named `frappe-ctl.skill.md`" — it was "the *installed* copy must be named uniquely, not `SKILL.md`, because agent skill directories (`.claude/skills/`, `.codex/skills/`, etc) are shared across tools, and a generic `SKILL.md` installed flat there would collide with any other tool's own file of the same name." That constraint applies only at install time, in `skills.ts`. It says nothing about what the checked-in source file is called.
 
-The two-file approach creates an obvious drift risk — skills.sh's CLI copies `SKILL.md`'s body verbatim into whichever agent installs it, so a stale copy would silently serve outdated instructions. Closed the same way prior freshness risks were closed (ADR-025): a test, not a manual reminder. `skill-file.test.ts` strips `SKILL.md`'s frontmatter and asserts the remainder is exactly `frappe-ctl.skill.md`'s content — verified working by deliberately introducing drift and confirming the test caught it before restoring.
+So: one file, `SKILL.md`, is canonical. `skills.ts` decouples `SOURCE_FILE_NAME` (`SKILL.md`, read from) from `INSTALLED_FILE_NAME` (`frappe-ctl.skill.md`, written to) — previously a single constant did both jobs. Frontmatter is stripped on install since it's metadata for skills.sh's discovery mechanism, not operator content; installed copies look exactly as `frappe-ctl.skill.md` always did.
 
-`SKILL.md` is deliberately **not** added to `package.json`'s `files` list — it exists purely for GitHub-based skills.sh discovery, not for our own `skills install` verb (which reads `frappe-ctl.skill.md` specifically via `import.meta.dir`-relative path regardless of install method). Packaging it into the npm tarball would add nothing but bloat.
+Every reference to a checked-in `frappe-ctl.skill.md` file was updated to `SKILL.md`: `package.json`'s `files` list (this is what actually ships in the npm tarball now), `AGENTS.md`, `.cursor/rules/frappe-ctl.mdc`'s `@frappe-ctl.skill.md` import (would have silently broken — that file no longer exists in the repo), README, `docs/site/index.html` and `quickstart.html`. References to the *installed* filename (`.claude/skills/frappe-ctl.skill.md` after running `skills install`) were left alone — that part didn't change.
 
 ## Consequences
-- ✅ `npx skills add MalharDotTech/frappe-ctl` now works — repo root satisfies skills.sh's discovery requirement
-- ✅ `frappe-ctl.skill.md`'s existing naming convention, all its references, and its own freshness tests are untouched
-- ✅ Drift between the two files is regression-tested, not manually maintained — verified the guard actually fires before relying on it
-- ⚠️ Any future edit to `frappe-ctl.skill.md`'s content must also touch `SKILL.md` (or vice versa) — the test will fail the build if one is edited without the other, which is the intended friction
-- ⚠️ Two files with the same operational content is inherent redundancy; acceptable given it's fully test-guarded and the alternative (renaming the canonical file) has wider blast radius
+- ✅ One source of truth — no drift risk to guard against, because there's nothing to drift from
+- ✅ `npx skills add MalharDotTech/frappe-ctl` works — repo root satisfies skills.sh's discovery requirement
+- ✅ Installed copies (`.claude/skills/frappe-ctl.skill.md` etc) are byte-identical to what shipped before this change — frontmatter stripped, same content, same filename, same collision-avoidance property in shared agent directories
+- ✅ `skill-file.test.ts` still guards verb-set freshness (ADR-025) and now also asserts `SKILL.md`'s frontmatter shape
+- ⚠️ Manual per-platform setup instructions (paste into ChatGPT, `@SKILL.md` in Claude Code) now reference a file with frontmatter at the top — three harmless YAML lines a human or agent just skips past, not a functional problem
+- ⚠️ Superseded the previous version of this ADR (two-files-kept-in-lockstep), written and reverted within the same work session before merge — no external consumers were ever affected

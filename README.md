@@ -352,9 +352,9 @@ Current decisions: [001 auth header](docs/adr/20260610-001-auth-header-format.md
 
 ## AI Agent Quick Setup
 
-`frappe-ctl.skill.md` ships with the package — drop it into your AI assistant and it instantly knows how to use the CLI efficiently.
+`SKILL.md` ships with the package — drop it into your AI assistant and it instantly knows how to use the CLI efficiently.
 
-Fastest path — `frappe-ctl skills install` copies it into every AI agent dir it detects in your project (`.claude/skills/`, `.cursor/skills/`, `.codex/skills/`, and 13 more), plus a common `.agents/skills/` path. Run `frappe-ctl skills install --all` to install for every supported agent regardless of detection, or `--global` to install into your home directory instead of the current project.
+Fastest path — `frappe-ctl skills install` reads it and installs a copy (as `frappe-ctl.skill.md`, frontmatter stripped) into every AI agent dir it detects in your project (`.claude/skills/`, `.cursor/skills/`, `.codex/skills/`, and 13 more), plus a common `.agents/skills/` path. Run `frappe-ctl skills install --all` to install for every supported agent regardless of detection, or `--global` to install into your home directory instead of the current project.
 
 Also listed on the community [skills.sh](https://skills.sh) directory — install with their CLI from any project, no frappe-ctl install required first:
 ```bash
@@ -363,15 +363,15 @@ npx skills add MalharDotTech/frappe-ctl
 
 | Platform | How to load |
 |----------|------------|
-| **Claude Code** | Add `@frappe-ctl.skill.md` to your project `CLAUDE.md`, or copy to `.claude/commands/` |
+| **Claude Code** | Add `@SKILL.md` to your project `CLAUDE.md`, or copy to `.claude/commands/` |
 | **Cursor** | Already in `.cursor/rules/frappe-ctl.mdc` — auto-loads |
 | **OpenAI Codex CLI** | Included in `AGENTS.md` at project root — auto-loads |
-| **ChatGPT / Perplexity** | Paste contents of `frappe-ctl.skill.md` into custom instructions |
+| **ChatGPT / Perplexity** | Paste contents of `SKILL.md` into custom instructions — the YAML frontmatter is harmless, just ignore it |
 | **Claude Desktop (MCP)** | See MCP setup below |
 
 After `bun add -g frappe-ctl`, find the skill file at:
 ```
-$(bun pm ls -g | grep frappe-ctl)/frappe-ctl.skill.md
+$(bun pm ls -g | grep frappe-ctl)/SKILL.md
 ```
 
 ---
