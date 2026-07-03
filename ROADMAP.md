@@ -39,7 +39,8 @@ Getting the tool into more hands, more channels.
 
 - [x] `fctl` short alias — second `bin` entry in `package.json`. Note: an unrelated npm package already uses the `fctl` bin name (v0.0.1, near-zero installs) — proceeded anyway, collision risk judged negligible.
 - [x] **Bug found while verifying the alias, fixed in the same PR**: `npm install -g frappe-ctl` was broken for everyone — `bin/frappe-ctl`'s `dirname "$0"` doesn't resolve through npm's global-install symlink, so it looked for `src/cli.ts` in the wrong place. Verified against a real `npm pack` + global install, not just a manual symlink. See ADR-026. Zero test coverage existed for the bin wrapper before this — now regression-tested (`src/bin-wrapper.test.ts`). Worth a patch release once merged, since earlier releases shipped broken.
-- [ ] Push to skills.sh — depends on `skills install` verb + a freshness-checked skill file (see Onboarding).
+- [x] Version bump 0.2.0 → 0.3.0 (minor — new backward-compatible verbs/flags since last publish, not just the bin-wrapper bug fix) — PR #12, published to npm 2026-07-02.
+- [ ] Push to skills.sh — depends on `skills install` verb + a freshness-checked skill file (see Onboarding), both done. Not yet actioned.
 - [ ] Shell completions (bash/zsh/fish) — already tracked as Phase 3 in `CLAUDE.md`.
 - [ ] Binary releases via `bun build --compile` + GitHub Actions — already tracked as Phase 3 in `CLAUDE.md`.
 
@@ -92,5 +93,5 @@ Visual and interaction polish. Deferred this cycle — not blocking release.
 3. ~~Security (remaining) — silent-fallback fix, Keychain ACL scoping spike, headless parity confirmation, new ADR~~ — done, see ADR-020
 4. ~~Functional — `skills install` verb → exit code `4` → agent env-var detect → `--debug` flag~~ — done. Prompt→command usage analysis scoped and deliberately parked until real external usage exists (2026-07-03).
 5. ~~Onboarding — skill file freshness check~~ — done, ADR-025
-6. **Distribution** — skills.sh push, `fctl` alias *(next up)*
+6. ~~Distribution — `fctl` alias~~ — done, PR #11 (also found and fixed a pre-existing `npm install -g` bug in the same PR, ADR-026). **Skills.sh push still open** *(next up)*
 7. Community/OSS + Aesthetics — next cycle

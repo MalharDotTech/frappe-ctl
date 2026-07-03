@@ -61,6 +61,8 @@ npx frappe-ctl next get Customer
 
 Requires [Bun](https://bun.sh) ≥ 1.3.0.
 
+Also installs as `fctl` — shorter for repeated invocations, identical behavior.
+
 **For development / contributing:**
 
 ```bash
@@ -88,6 +90,8 @@ frappe-ctl profile use prod
 ```
 
 Config lives at `~/.config/frappe-ctl/config.json`. Override location with `FRAPPE_CTL_CONFIG_DIR`.
+
+Troubleshooting multi-profile setups: `--debug` prints the resolved profile name + URL and which auth path is active (OAuth bearer or `api_key:api_secret`) to stderr before the command runs. Never prints the credential value itself.
 
 ---
 
@@ -257,6 +261,7 @@ frappe-ctl next get Customer -o csv
 
 - **TTY** → table by default
 - **Pipe / non-TTY** → JSON by default
+- **Running under a known AI agent** (Claude Code, Cursor, Codex, and 20+ others) → JSON by default, even in a TTY — some agent harnesses attach a pty, so a real terminal check alone isn't reliable. Detected via env vars, no config needed.
 - Override with `-o json|table|csv`
 
 ```bash
@@ -266,6 +271,14 @@ frappe-ctl next get SalesOrder --filter "status=Open" | jq '.[].name'
 # Token-efficient agent pipeline
 frappe-ctl next get SalesOrder --sparse --strip-meta | jq '.'
 ```
+
+### Exit codes
+
+| Code | Meaning |
+|------|---------|
+| `0` | Success |
+| `1` | Error — bad input, HTTP failure, validation failure |
+| `4` | Auth required — no profile configured, named profile not found, or HTTP 401. **Not** raised for HTTP 403 (Frappe also returns 403 for plain permission errors on a valid session — re-auth wouldn't fix that) |
 
 ---
 
@@ -438,6 +451,8 @@ frappe-ctl mcp --site prod         # use specific profile
 ---
 
 ## Roadmap
+
+Live, actively maintained planning lives in **[ROADMAP.md](ROADMAP.md)** — bucketed by impact (Functional/Security/Distribution/Onboarding/etc), not phase number. The Phase 1/2 history below is accurate and kept for the record; Phase 3 items not yet done are also tracked in ROADMAP.md's Distribution bucket going forward.
 
 ### Phase 1 — ERPNext complete ✅
 
