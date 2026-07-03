@@ -344,7 +344,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  // skills sub-command — installs frappe-ctl.skill.md into agent-specific dirs, no site context needed
+  // skills sub-command — installs SKILL.md into agent-specific dirs, no site context needed
   if (argv[0] === "skills") {
     const sub = argv[1];
     const parsed = parseArgs(argv.slice(2));

@@ -491,7 +491,7 @@
       <div class="body">
         <strong>Fastest path — one command</strong>
         <pre style="margin:8px 0 0"><span class="prompt">$</span> frappe-ctl skills install</pre>
-        Auto-detects and installs the skill file into every AI agent dir already in your project (<code>.claude/skills/</code>, <code>.cursor/skills/</code>, <code>.codex/skills/</code>, and 13 more). Add <code>--all</code> to install for every supported agent regardless of detection, or <code>--global</code> for your home directory instead of the current project. Skip the manual table below if this covers your setup.
+        Auto-detects and installs the skill file into every AI agent dir already in your project (<code>.claude/skills/</code>, <code>.cursor/skills/</code>, <code>.codex/skills/</code>, and 13 more), using the standard <a href="https://agentskills.io" target="_blank">Agent Skills</a> directory shape those tools actually auto-discover. Add <code>--all</code> to install for every supported agent regardless of detection, or <code>--global</code> for your home directory instead of the current project. Skip the manual table below if this covers your setup.
       </div>
     </div>
 
@@ -534,7 +534,7 @@
       <div class="body">
         <strong>Claude Code one-liner</strong>
         Add this to your project <code>CLAUDE.md</code>:
-        <pre style="margin:8px 0 0">@./node_modules/frappe-ctl/frappe-ctl.skill.md</pre>
+        <pre style="margin:8px 0 0">@./node_modules/frappe-ctl/SKILL.md</pre>
         Claude Code loads it automatically on every session.
       </div>
     </div>

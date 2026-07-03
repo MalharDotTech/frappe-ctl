@@ -39,7 +39,7 @@ NOT `Bearer`, NOT `Basic`. Every transport layer uses this. See `src/client.ts` 
 `npm install -g` always symlinks the bin into a separate global bin dir. `dirname "$0"` alone resolves relative to the symlink's own directory, not the real script's — breaks `src/cli.ts` lookup. Wrapper loops through symlinks manually; no `readlink -f` (GNU-only, macOS ships BSD `readlink`). Regression-tested in `src/bin-wrapper.test.ts` — this class of bug had zero test coverage before ADR-026, verify any future wrapper change against it.
 
 ### `SKILL.md` is the single canonical skill file (ADR-027)
-Repo root carries `SKILL.md` — YAML frontmatter (`name`/`description`, required by skills.sh discovery) + the full operator reference as its body. `skills install` reads this file and strips the frontmatter before writing installed copies, which keep the `frappe-ctl.skill.md` name deliberately (agent skill dirs are shared across tools; a generic `SKILL.md` installed flat there would collide with any other tool's own file). One source of truth — edit `SKILL.md`, installed copies regenerate correctly on next `skills install` run.
+Repo root carries `SKILL.md` — YAML frontmatter (`name`/`description`) + the full operator reference as its body. `skills install` copies it (frontmatter kept) to `<target>/frappe-ctl/SKILL.md` in each agent dir — nested directory, standard filename, matching the Agent Skills open standard (agentskills.io) that Claude Code, Cursor, Codex etc actually scan for. A flat file or stripped frontmatter is invisible to their auto-discovery (ADR-028) — verified against Claude Code's own docs and skills.sh's real installer output, not assumed. One source of truth — edit `SKILL.md`, installed copies regenerate correctly on next `skills install` run.
 
 ### Versioning: `vX` only
 `v14`, `v15`, `v16` — major only. `vX.Y` is rejected.
@@ -130,7 +130,7 @@ src/
     report.ts         saved Report runner
     resources.ts      DocType lister per app
     agent-context.ts  static CLI schema + DocType-scoped compact schema
-    skills.ts         reads SKILL.md, strips frontmatter, installs as frappe-ctl.skill.md in agent-specific dirs (skills install, ADR-027)
+    skills.ts         reads SKILL.md, installs to <target>/frappe-ctl/SKILL.md per agent (skills install, ADR-028)
   oauth.ts            PKCE helpers
   token-store.ts      macOS Keychain + file fallback (0o600)
   errors.ts           AuthRequiredError — maps to exit code 4 (ADR-022)

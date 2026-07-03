@@ -26,22 +26,18 @@ export const SKILL_AGENT_PATHS: Record<string, string> = {
 // Always installed regardless of agent selection.
 export const COMMON_SKILL_PATH = ".agents/skills/";
 
-// SKILL.md (repo root) is the single canonical source — carries YAML
-// frontmatter for skills.sh discovery (ADR-027). Installed copies keep the
-// frappe-ctl.skill.md name deliberately: agent skills dirs are shared across
-// tools, and a generically-named SKILL.md installed flat there would collide
-// with any other tool that names its own file the same way.
+// Agent Skills open standard (agentskills.io, adopted by Claude Code, Cursor,
+// Codex, and dozens more): a skill is a directory named after the skill,
+// containing SKILL.md with YAML frontmatter (name/description) — agents load
+// only that frontmatter at startup, then the full body when the skill
+// activates. A flat file does not get discovered (ADR-028) — confirmed
+// against Claude Code's own docs and by installing via skills.sh's own CLI
+// and inspecting its output before building this.
+export const SKILL_NAME = "frappe-ctl";
 const SOURCE_FILE_NAME = "SKILL.md";
-const INSTALLED_FILE_NAME = "frappe-ctl.skill.md";
 
 function skillSourcePath(): string {
   return join(import.meta.dir, "..", "..", SOURCE_FILE_NAME);
-}
-
-// Frontmatter is metadata for skills.sh discovery, not operator content —
-// installed copies stay exactly as frappe-ctl.skill.md always looked.
-function stripFrontmatter(content: string): string {
-  return content.replace(/^---\n[\s\S]*?\n---\n/, "");
 }
 
 // A detected agent = its own base config dir already exists in the target
@@ -57,9 +53,9 @@ function detectAgents(root: string): string[] {
 }
 
 function installOne(root: string, relPath: string, content: string): string {
-  const dir = join(root, relPath);
+  const dir = join(root, relPath, SKILL_NAME);
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-  const target = join(dir, INSTALLED_FILE_NAME);
+  const target = join(dir, SOURCE_FILE_NAME);
   writeFileSync(target, content, "utf8");
   return target;
 }
@@ -96,7 +92,7 @@ export function cmdSkillsInstall(opts: SkillsInstallOptions): void {
     targets = detectAgents(root);
   }
 
-  const content = stripFrontmatter(readFileSync(skillSourcePath(), "utf8"));
+  const content = readFileSync(skillSourcePath(), "utf8");
   const installedPaths: string[] = [];
 
   for (const agent of targets) {
