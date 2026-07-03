@@ -5,7 +5,7 @@ import { FrappeClient } from "../client.ts";
 const SCHEMA_VERSION = "3";
 
 // Exported for skill-file.test.ts — single source of truth for the doc-scoped
-// verb set, cross-checked against frappe-ctl.skill.md's Verb Reference table.
+// verb set, cross-checked against SKILL.md's Verb Reference table.
 export const VERBS = [
   {
     name: "get",

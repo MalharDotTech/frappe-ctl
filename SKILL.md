@@ -1,3 +1,7 @@
+---
+name: frappe-ctl
+description: Operator skill for frappe-ctl, the kubectl-style CLI for Frappe/ERPNext. Teaches an AI agent the verb grammar, auth setup, safety rules, and token-efficient output patterns for operating Frappe/ERPNext sites.
+---
 # frappe-ctl — Operator Skill
 
 CLI for Frappe/ERPNext. Grammar: `frappe-ctl [--site <profile>] <app> <verb> <DocType> [name] [flags]`

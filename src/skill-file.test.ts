@@ -4,13 +4,14 @@ import { join } from "path";
 import { VERBS } from "./commands/agent-context.ts";
 import { CLI_VERBS } from "./cli.ts";
 
-// frappe-ctl.skill.md is what `skills install` distributes to AI agents
-// (ADR-021) — it must never fall behind the real verb set. "Fresh" means no
-// verb missing or renamed; flags/examples stay curated, not exhaustive
-// (ADR-025) — a skill file that mirrors --help 1:1 defeats its own
-// token-efficiency purpose.
+// SKILL.md (repo root) is the single canonical skill file — carries YAML
+// frontmatter for skills.sh discovery (ADR-027) and is what `skills install`
+// distributes to AI agents, frontmatter stripped (ADR-021). It must never
+// fall behind the real verb set. "Fresh" means no verb missing or renamed;
+// flags/examples stay curated, not exhaustive (ADR-025) — a skill file that
+// mirrors --help 1:1 defeats its own token-efficiency purpose.
 function skillFileVerbs(): Set<string> {
-  const content = readFileSync(join(import.meta.dir, "..", "frappe-ctl.skill.md"), "utf8");
+  const content = readFileSync(join(import.meta.dir, "..", "SKILL.md"), "utf8");
   const section = content.split("## Verb Reference")[1]?.split("## Token Efficiency")[0] ?? "";
   const verbs = new Set<string>();
   for (const match of section.matchAll(/^\| `([a-z-]+)` \|/gm)) {
@@ -23,7 +24,7 @@ function skillFileVerbs(): Set<string> {
 // skill file's same table) is expected alongside every VERBS entry.
 const EXPECTED_VERBS = new Set([...VERBS.map((v) => v.name), "agent-context"]);
 
-describe("frappe-ctl.skill.md — verb freshness", () => {
+describe("SKILL.md — verb freshness", () => {
   it("documents every verb the CLI actually has", () => {
     const documented = skillFileVerbs();
     const missing = [...EXPECTED_VERBS].filter((v) => !documented.has(v));
@@ -38,6 +39,11 @@ describe("frappe-ctl.skill.md — verb freshness", () => {
 
   it("finds at least one verb — guards against the extraction itself silently matching nothing", () => {
     expect(skillFileVerbs().size).toBeGreaterThan(0);
+  });
+
+  it("has YAML frontmatter with name and description (required by skills.sh, ADR-027)", () => {
+    const content = readFileSync(join(import.meta.dir, "..", "SKILL.md"), "utf8");
+    expect(content).toMatch(/^---\nname: frappe-ctl\ndescription: .+\n---\n/);
   });
 });
 

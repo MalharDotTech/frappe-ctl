@@ -4,4 +4,4 @@ globs: []
 alwaysApply: true
 ---
 
-@frappe-ctl.skill.md
+@SKILL.md

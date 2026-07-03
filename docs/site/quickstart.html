@@ -484,7 +484,7 @@
 
     <!-- SKILL FILE -->
     <h3 style="margin-top:0">Skill file — give any AI instant context</h3>
-    <p><code>frappe-ctl.skill.md</code> ships with the package. Drop it into your AI and it immediately knows how to use the CLI: token-efficient patterns, verb reference, safety rules, output parsing.</p>
+    <p><code>SKILL.md</code> ships with the package. Drop it into your AI and it immediately knows how to use the CLI: token-efficient patterns, verb reference, safety rules, output parsing.</p>
 
     <div class="callout tip">
       <div class="icon">✓</div>
@@ -500,7 +500,7 @@
       <tbody>
         <tr>
           <td>Claude Code</td>
-          <td>Add <code>@frappe-ctl.skill.md</code> to your project <code>CLAUDE.md</code></td>
+          <td>Add <code>@SKILL.md</code> to your project <code>CLAUDE.md</code></td>
           <td style="color:var(--muted)">manual</td>
         </tr>
         <tr>
@@ -520,14 +520,14 @@
         </tr>
         <tr>
           <td>ChatGPT / Perplexity</td>
-          <td>Paste <code>frappe-ctl.skill.md</code> contents into custom instructions</td>
+          <td>Paste <code>SKILL.md</code> contents into custom instructions</td>
           <td style="color:var(--muted)">manual</td>
         </tr>
       </tbody>
     </table>
 
     <p>After installing globally, find the skill file at:</p>
-    <pre><span class="prompt">$</span> cat $(npm root -g)/frappe-ctl/frappe-ctl.skill.md</pre>
+    <pre><span class="prompt">$</span> cat $(npm root -g)/frappe-ctl/SKILL.md</pre>
 
     <div class="callout tip">
       <div class="icon">✓</div>

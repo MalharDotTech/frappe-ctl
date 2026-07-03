@@ -10,7 +10,7 @@
   "files": [
     "bin/",
     "src/",
-    "frappe-ctl.skill.md",
+    "SKILL.md",
     "!src/**/*.test.ts",
     "!src/__fixtures__/"
   ],
