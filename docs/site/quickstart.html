@@ -486,6 +486,15 @@
     <h3 style="margin-top:0">Skill file — give any AI instant context</h3>
     <p><code>frappe-ctl.skill.md</code> ships with the package. Drop it into your AI and it immediately knows how to use the CLI: token-efficient patterns, verb reference, safety rules, output parsing.</p>
 
+    <div class="callout tip">
+      <div class="icon">✓</div>
+      <div class="body">
+        <strong>Fastest path — one command</strong>
+        <pre style="margin:8px 0 0"><span class="prompt">$</span> frappe-ctl skills install</pre>
+        Auto-detects and installs the skill file into every AI agent dir already in your project (<code>.claude/skills/</code>, <code>.cursor/skills/</code>, <code>.codex/skills/</code>, and 13 more). Add <code>--all</code> to install for every supported agent regardless of detection, or <code>--global</code> for your home directory instead of the current project. Skip the manual table below if this covers your setup.
+      </div>
+    </div>
+
     <table class="cmd-table" style="margin-bottom:28px">
       <thead><tr><th>Platform</th><th>How to load</th><th>Auto?</th></tr></thead>
       <tbody>
@@ -618,10 +627,10 @@
     <h2>7. Troubleshooting</h2>
 
     <h3>401 Unauthorized</h3>
-    <p>API key or secret is wrong, or the user doesn't have API access enabled. In Frappe go to <strong>User → API Access → Generate Keys</strong>. Make sure you copied the <em>secret</em> (not just the key — they're different values).</p>
+    <p>API key or secret is wrong, or the user doesn't have API access enabled. In Frappe go to <strong>User → API Access → Generate Keys</strong>. Make sure you copied the <em>secret</em> (not just the key — they're different values). frappe-ctl exits with code <code>4</code> for this, not the generic <code>1</code> — agents can branch on that instead of parsing stderr text.</p>
 
     <h3>403 Forbidden</h3>
-    <p>The user has API access but lacks permission for this DocType. Add the DocType to the user's role permissions in Frappe.</p>
+    <p>The user has API access but lacks permission for this DocType. Add the DocType to the user's role permissions in Frappe. Note: this exits <code>1</code>, not <code>4</code> — Frappe uses 403 for plain permission errors on a fully valid session too, so frappe-ctl doesn't treat it as "needs re-auth."</p>
 
     <h3>command not found: frappe-ctl</h3>
     <p>Bun's global bin directory is not in your PATH. Add it:</p>
@@ -632,7 +641,7 @@
     <p>Frappe returns 417 when a filter field is not in its allowlist, or the <code>in</code> operator receives an array instead of a comma-separated string. Use <code>"field,in,A,B,C"</code> syntax.</p>
 
     <h3>Output is a table but I want JSON</h3>
-    <p>JSON is the default when stdout is not a TTY (i.e., when piped). Force it explicitly:</p>
+    <p>JSON is the default when stdout is not a TTY (i.e., when piped), or when frappe-ctl detects it's running under a known AI agent (Claude Code, Cursor, Codex, and 20+ others) via env vars — even in a real terminal. Force it explicitly:</p>
     <pre><span class="prompt">$</span> frappe-ctl next get Customer <span class="flag">-o json</span></pre>
 
     <h3>MCP not appearing in Claude Desktop</h3>

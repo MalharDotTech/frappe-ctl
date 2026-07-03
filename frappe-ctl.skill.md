@@ -106,6 +106,16 @@ frappe-ctl next bulk patch "Sales Order" \
 
 Errors → stderr. Data → stdout. Never mixed.
 
+**Exit codes** — branch on these instead of parsing stderr text:
+
+| Code | Meaning |
+|------|---------|
+| `0` | Success |
+| `1` | Error — bad input, HTTP failure, validation failure |
+| `4` | Auth required — no profile, named profile not found, or HTTP 401. **Not** raised for 403 (Frappe uses 403 for plain permission errors too — re-auth won't fix those) |
+
+You already get JSON by default — no `--output json` needed. Running as an agent (Claude Code, Cursor, Codex, and others) is auto-detected via env vars, so output is JSON even if a pty makes the process look like a TTY. Use `--debug` if a command behaves unexpectedly across profiles — prints resolved profile + auth source to stderr, never the credential value.
+
 ---
 
 ## Common Patterns
