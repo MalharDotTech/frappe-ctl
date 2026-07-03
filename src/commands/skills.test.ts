@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
-import { cmdSkillsInstall, SKILL_AGENT_PATHS, COMMON_SKILL_PATH } from "./skills.ts";
+import { cmdSkillsInstall, SKILL_AGENT_PATHS, COMMON_SKILL_PATH, SKILL_NAME } from "./skills.ts";
 
 let cwd: string;
 let home: string;
@@ -17,15 +17,16 @@ afterEach(() => {
   rmSync(home, { recursive: true, force: true });
 });
 
+// Agent Skills open standard (agentskills.io, adopted by Claude Code, Cursor,
+// Codex, etc): a skill is a directory named after the skill containing
+// SKILL.md. Confirmed against Claude Code's own docs and skills.sh's real
+// installer output before building this — flat files aren't discovered.
 function installed(root: string, relPath: string): boolean {
-  return existsSync(join(root, relPath, "frappe-ctl.skill.md"));
+  return existsSync(join(root, relPath, SKILL_NAME, "SKILL.md"));
 }
 
-// SKILL.md (canonical source, ADR-027) carries YAML frontmatter that
-// installed copies deliberately don't — strip it the same way skills.ts does.
-function canonicalInstalledContent(): string {
-  const raw = readFileSync(join(import.meta.dir, "..", "..", "SKILL.md"), "utf8");
-  return raw.replace(/^---\n[\s\S]*?\n---\n/, "");
+function canonicalContent(): string {
+  return readFileSync(join(import.meta.dir, "..", "..", "SKILL.md"), "utf8");
 }
 
 describe("cmdSkillsInstall — --all", () => {
@@ -37,10 +38,10 @@ describe("cmdSkillsInstall — --all", () => {
     expect(installed(cwd, COMMON_SKILL_PATH)).toBe(true);
   });
 
-  it("writes content identical to SKILL.md with frontmatter stripped", () => {
+  it("writes content identical to SKILL.md, frontmatter kept (agents need name/description for discovery)", () => {
     cmdSkillsInstall({ all: true, cwd, home });
-    const written = readFileSync(join(cwd, SKILL_AGENT_PATHS["claude"]!, "frappe-ctl.skill.md"), "utf8");
-    expect(written).toBe(canonicalInstalledContent());
+    const written = readFileSync(join(cwd, SKILL_AGENT_PATHS["claude"]!, SKILL_NAME, "SKILL.md"), "utf8");
+    expect(written).toBe(canonicalContent());
   });
 });
 
@@ -104,10 +105,10 @@ describe("cmdSkillsInstall — idempotency", () => {
   });
 
   it("overwrites stale content on reinstall", () => {
-    const target = join(cwd, SKILL_AGENT_PATHS["claude"]!, "frappe-ctl.skill.md");
-    mkdirSync(join(cwd, SKILL_AGENT_PATHS["claude"]!), { recursive: true });
+    const target = join(cwd, SKILL_AGENT_PATHS["claude"]!, SKILL_NAME, "SKILL.md");
+    mkdirSync(join(cwd, SKILL_AGENT_PATHS["claude"]!, SKILL_NAME), { recursive: true });
     writeFileSync(target, "stale content", "utf8");
     cmdSkillsInstall({ agents: ["claude"], cwd, home });
-    expect(readFileSync(target, "utf8")).toBe(canonicalInstalledContent());
+    expect(readFileSync(target, "utf8")).toBe(canonicalContent());
   });
 });

@@ -10,8 +10,10 @@ tags: [skills, distribution, skills-sh]
 
 # ADR-027: `SKILL.md` is the single canonical skill file
 
+> **Amended by [ADR-028](20260704-028-skill-install-nested-directory.md):** the "installed copy" half of this decision (frontmatter stripped, flat unique filename) was itself wrong — corrected there. The "single canonical `SKILL.md` at repo root" finding below still holds.
+
 ## Decision
-Repo root carries exactly one skill file, `SKILL.md`, with YAML frontmatter (`name: frappe-ctl`, `description: ...`) followed by the full operator reference as its body. `skills install` reads this file, strips the frontmatter, and writes the result as `frappe-ctl.skill.md` into each installed agent directory. `frappe-ctl.skill.md` never exists as a checked-in file — only as a generated, install-time copy.
+Repo root carries exactly one skill file, `SKILL.md`, with YAML frontmatter (`name: frappe-ctl`, `description: ...`) followed by the full operator reference as its body. `skills install` reads this file and installs a copy into each target agent directory (see ADR-028 for the corrected installed format).
 
 ## Context
 Investigated what "push to frappe-ctl to skills.sh" (`ROADMAP.md` Distribution bucket) actually requires. Finding: skills.sh has no submission process — its `npx skills add <owner>/<repo>` CLI (github.com/vercel-labs/skills) pulls directly from any public git repo. The only requirement is discoverability in the shape their CLI expects: a file literally named `SKILL.md` with YAML frontmatter, found at repo root or under `skills/<name>/`.
@@ -27,7 +29,7 @@ Every reference to a checked-in `frappe-ctl.skill.md` file was updated to `SKILL
 ## Consequences
 - ✅ One source of truth — no drift risk to guard against, because there's nothing to drift from
 - ✅ `npx skills add MalharDotTech/frappe-ctl` works — repo root satisfies skills.sh's discovery requirement
-- ✅ Installed copies (`.claude/skills/frappe-ctl.skill.md` etc) are byte-identical to what shipped before this change — frontmatter stripped, same content, same filename, same collision-avoidance property in shared agent directories
-- ✅ `skill-file.test.ts` still guards verb-set freshness (ADR-025) and now also asserts `SKILL.md`'s frontmatter shape
-- ⚠️ Manual per-platform setup instructions (paste into ChatGPT, `@SKILL.md` in Claude Code) now reference a file with frontmatter at the top — three harmless YAML lines a human or agent just skips past, not a functional problem
+- ✅ `skill-file.test.ts` guards verb-set freshness (ADR-025) and asserts `SKILL.md`'s frontmatter shape
+- ⚠️ Manual per-platform setup instructions (paste into ChatGPT, `@SKILL.md` in Claude Code) reference a file with frontmatter at the top — three harmless YAML lines a human or agent just skips past, not a functional problem
 - ⚠️ Superseded the previous version of this ADR (two-files-kept-in-lockstep), written and reverted within the same work session before merge — no external consumers were ever affected
+- ⚠️ See ADR-028 for what this ADR got wrong about the installed-copy format, and the correction

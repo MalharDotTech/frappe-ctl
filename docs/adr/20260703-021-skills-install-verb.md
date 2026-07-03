@@ -4,14 +4,16 @@ title: "skills install verb — non-interactive, detected-only default"
 date: 2026-07-03
 status: accepted
 frappe_version: "v16"
-frappe_ctl_version: "0.2.0"
+frappe_ctl_version: "0.3.0"
 tags: [skills, distribution, agent-native, chctl-inspired]
 ---
 
 # ADR-021: `skills install` verb — non-interactive, detected-only default
 
+> **Amended by [ADR-028](20260704-028-skill-install-nested-directory.md):** the exact installed format described below (flat `frappe-ctl.skill.md` file) turned out not to match what any Agent-Skills-standard-compliant tool actually auto-discovers — corrected there to `<target>/frappe-ctl/SKILL.md`. The scope-default decision (non-interactive, `--detected-only`) and agent-path list below are unaffected and still accurate.
+
 ## Decision
-`frappe-ctl skills install` copies `frappe-ctl.skill.md` into agent-specific skill dirs (`.claude/skills/`, `.codex/skills/`, etc — 16 total, plus a common `.agents/skills/` path always included). With no flags, it defaults to installing only into agent dirs already present in the target root (`--detected-only` semantics) — never prompts. `--all`, `--agent <name>` (repeatable), and `--global` (home dir instead of cwd) override the default.
+`frappe-ctl skills install` copies the skill file into agent-specific skill dirs (`.claude/skills/`, `.codex/skills/`, etc — 16 total, plus a common `.agents/skills/` path always included). With no flags, it defaults to installing only into agent dirs already present in the target root (`--detected-only` semantics) — never prompts. `--all`, `--agent <name>` (repeatable), and `--global` (home dir instead of cwd) override the default.
 
 ## Context
 Inspired by `clickhousectl skills` (see `ROADMAP.md` chctl-inspired section), which installs its own skill file into the same style of per-agent directory. chctl's default behavior is interactive — prompts a human to pick scope and agents when no flags are given.
